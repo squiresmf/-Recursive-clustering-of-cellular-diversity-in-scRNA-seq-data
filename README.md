@@ -11,6 +11,6 @@ Code is in a script format, written in R, where:
       - Crohn's R files 1-7 were run.
    
 Benchmark dataset files can be reconstructed from scratch by following the snakemake pipelines available [here](https://github.com/satijalab/azimuth-references) within the human_pbmc, human_adipose, human_tonsil, and human_fetus folders.
-Benchmark dataset files are also made available for download [here](https://drive.google.com/drive/folders/1C2IHKshcam3Db_TnmL3gDcyVcElYZpOI?usp=sharing).
+Benchmark dataset files are also made available for download [here](https://drive.google.com/file/d/1Gbm7U6pvKWmEv3ZotuJRxA4oj4tIWSVS/view?usp=sharing).
 
 The Crohn's disease dataset is currently not publicly available due to instituntional policy.
