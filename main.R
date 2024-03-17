@@ -16,36 +16,23 @@ do_integrate = FALSE
 assay = 'integrated'
 #####################################################################################
 # These are the all libraries needed to run all code across all files
+library(Matrix)
 library(Seurat)
-library(sctransform)
 library(ggplot2)
-library(plotly)
-library(orca)
 library(reshape2)
 library(gridExtra)
-library(cluster)
-library(ggpubr)
 library(assertthat)
 library(stringr)
-library(plotly)
-library(mutoss)
-library(matrixStats)
-library(data.table)
 library(colorspace)
 library(dplyr)
 library(data.tree)
-library(DiagrammeR)
 library(networkD3)
-library(ggnewscale)
 library(webshot)
 library(grid)
 library(magick)
 library("png")
 library(stringi)
-library(Matrix)
-library(SeuratData)
 library(SeuratDisk)
-library(lsa)
 
 # Other parameters
 DEG_cutoff = 0

@@ -4,7 +4,6 @@
 
 library(showtext)
 library(ggpubr)
-library(remotes)
 
 font_add_google("PT Sans Narrow", family = "narrow")
 showtext_auto()
