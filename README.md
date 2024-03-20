@@ -1,7 +1,7 @@
 This repository includes the code used in the *Recursive clustering of cellular diversity in scRNA-seq* paper.
 
 Code is in a script format, written in R, where:
-  - To peform rercusive and single-pass equivalent clustering analysis, file main.R is run for a variety of resolutions for each dataset, then:
+  - To peform rercusive and single-pass equivalent clustering analysis, file **main.R** is run for a variety of resolutions for each dataset, then:
       - **Benchmark Analysis.R**: Generates the benchmark mean cell type cluster purity metric plots for the four scRNA-seq benchmark datasets (Figure 3).
       - **Relative Cell Type Performance.R**: Generates scatter plots of cell type cluster purity for recursive verus single-pass method results (Figure 4).
       - **Generate PBMC** Example.R: Generates heatmap plots for recursive and seurat equivalent cluster purity results (Figure 2 when run after main.R has been run with c_resolution = 0.02 and reference_name = "human_PBMC/").
