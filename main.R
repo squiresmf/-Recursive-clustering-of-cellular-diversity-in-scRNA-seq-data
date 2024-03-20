@@ -10,11 +10,9 @@ reference_name = "human_PBMC/"
 # reference_name = "human_tonsil/"
 # reference_name = "human_fetus/"
 
-is_helmsley = FALSE #If FALSE, use a reference dataset, if TRUE, use the Chron's disease dataset
+is_helmsley = FALSE #If FALSE, use a benchmark reference dataset, if TRUE, use the Chron's disease dataset
 #####################################################################################
-do_integrate = FALSE
-assay = 'integrated'
-#####################################################################################
+
 # These are the all libraries needed to run all code across all files
 library(Matrix)
 library(Seurat)
@@ -35,16 +33,16 @@ library(stringi)
 library(SeuratDisk)
 
 # Other parameters
+do_integrate = FALSE
+assay = 'integrated'
 DEG_cutoff = 0
 if (is_helmsley) {
   entropy_cutoff = 0.5
 } else {
   entropy_cutoff = 0
 }
-
 do_lower_clusters_higher_UMAP = FALSE
 m_level = 3
-use_annotations=FALSE
 
 options(future.globals.maxSize = 20000 * 1024^2)
 
