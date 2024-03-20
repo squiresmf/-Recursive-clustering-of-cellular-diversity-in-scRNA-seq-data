@@ -9,9 +9,9 @@ Code is in a script format, written in R, where:
   - To analyze the Crohn's disease dataset, main.R was run with is_helmsley=TRUE and c_resolution = 0.1, then:
       - **TreePlot.R** was run.
       - Crohn's R files 1-7 were run.
-  - The analysis was performed using Seurat V4 and R version 4.0.5.
+  - The analysis was performed using Seurat version 4.2.0 and R version 4.0.5.
       - **renv.lock** is a renv file containing the exact versions of all installed libraries at the time of analysis.
-      - **Install Libraries.R** may be a useful script for getting matching R libraries installed.
+      - **Install Libraries.R** may be a useful script for getting Seurat version 4.2.0 and other needed R libraries installed.
    
 Benchmark dataset files can be reconstructed from scratch by following the snakemake pipelines available [here](https://github.com/satijalab/azimuth-references) within the human_pbmc, human_adipose, human_tonsil, and human_fetus folders.
 Benchmark dataset files are also made available for download [here](https://drive.google.com/file/d/1Gbm7U6pvKWmEv3ZotuJRxA4oj4tIWSVS/view?usp=sharing).
