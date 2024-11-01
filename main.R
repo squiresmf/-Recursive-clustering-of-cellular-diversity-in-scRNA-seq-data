@@ -49,8 +49,8 @@ HVGs = 2000
 downsample = 0
 
 if (reference == 'Helmsley') {
-  entropy_cutoff = 0.5 # This is the default entropy cutoff parameter for section 2.3 results
-  # entropy_cutoff = 0 # Use the entropy cutoff parameter of 0 to generate the full clustering used in supplementary section 5
+  # entropy_cutoff = 0.5 # This is the default entropy cutoff parameter for section 2.3 results
+  entropy_cutoff = 0 # Use the entropy cutoff parameter of 0 to generate the full clustering used in supplementary section 5
 } else {
   entropy_cutoff = 0
 }
@@ -85,12 +85,12 @@ if (entropy_cutoff != 0) {
   name_extra = paste(name_extra, 'entropy_cutoff', entropy_cutoff)
 }
 
-current_dir = ""
-if (.Platform$OS.type == "windows") {
-  current_dir = paste0(current_dir, 'Y:')
-}
-current_dir = paste0(current_dir, '/qiu-lab/Michael Recursive Clustering/')
-# current_dir <- getwd()
+# current_dir = ""
+# if (.Platform$OS.type == "windows") {
+#   current_dir = paste0(current_dir, 'Y:')
+# }
+# current_dir = paste0(current_dir, '/qiu-lab/Michael Recursive Clustering/')
+current_dir <- paste0(getwd(), '/')
 
 SetDirRead <- function() {
   setwd_path = current_dir

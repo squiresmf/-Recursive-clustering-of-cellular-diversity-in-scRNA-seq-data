@@ -9,7 +9,7 @@ library(ggplot2)
 #   current_dir = paste0(current_dir, 'Y:')
 # }
 # current_dir = paste0(current_dir, '/qiu-lab/Michael Recursive Clustering/')
-current_dir <- getwd()
+current_dir <- paste0(getwd(), '/')
 
 SetDirRead <- function() {
   setwd_path = current_dir

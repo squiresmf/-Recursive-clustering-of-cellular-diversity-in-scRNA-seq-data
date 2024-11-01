@@ -20,7 +20,7 @@ is_res_range_smalls = FALSE
 #   current_dir = paste0(current_dir, 'Y:')
 # }
 # current_dir = paste0(current_dir, '/qiu-lab/Michael Recursive Clustering/')
-current_dir <- getwd()
+current_dir <- paste0(getwd(), '/')
 
 celltype_counts <- data.frame(
   Reference = character(),

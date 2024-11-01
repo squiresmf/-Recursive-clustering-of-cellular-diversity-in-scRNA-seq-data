@@ -11,12 +11,15 @@ algorithm = 'Louvain'
 HVGs = 2000
 # # HVGs = 3000
 
+res_range_small = FALSE
+# res_range_small = TRUE
+
 # current_dir = ""
 # if (.Platform$OS.type == "windows") {
 #   current_dir = paste0(current_dir, 'Y:')
 # }
 # current_dir = paste0(current_dir, '/qiu-lab/Michael Recursive Clustering/')
-current_dir <- getwd()
+current_dir <- paste0(getwd(), '/')
 
 SetDirRead <- function() {
   setwd_path = current_dir
