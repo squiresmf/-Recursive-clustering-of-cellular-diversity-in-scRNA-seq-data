@@ -41,7 +41,7 @@ To reproduce Fig. S1 through S4:
   - Change the above algorithm and HVGs setting for each of the the following and:
       - Run file **main.R** with reference equal to each of the benchmark dataset values ('PBMC', 'Adipose', 'Tonsil', 'Fetus'), with c_resolution equal to each value of the default resolution range (0.015 to 0.15 by 0.005 increments), downsample = 0
       - Run file **metrics.R** with is_res_range_small = FALSE
-      - Run file **Metric Plot.R** with is_res_range_smalls = FALSE, evaluation_types = 'cell type'.
+      - Run file **Metric Plot.R** with is_res_range_smalls = FALSE, evaluation_types = 'cell type'.  This will produce Fig. S1 through S4.
    
   To reproduce Fig. S5 and S6:
   - Run file **main.R** with reference equal to each of the benchmark dataset values ('PBMC', 'Adipose', 'Tonsil', 'Fetus'), with c_resolution equal to 0.005 to 0.05 by increments of 0.002 for the PBMC, adipose, and tonsil references, and c_resolution equal to 0.0025 to 0.01 by increments of 0.0002 for the fetus reference, algorithm = 'Louvain', HVGs = 2000, downsample = 0 (assuming **main.R** has already been run for the default range at some point).
