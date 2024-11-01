@@ -44,7 +44,7 @@ To reproduce Fig. S1 through S4:
       - Run file **Metric Plot.R** with is_res_range_smalls = FALSE, evaluation_types = 'cell type'.  This will produce Fig. S1 through S4.
    
   To reproduce Fig. S5 and S6:
-  - Run file **main.R** with reference equal to each of the benchmark dataset values ('PBMC', 'Adipose', 'Tonsil', 'Fetus'), with c_resolution equal to 0.005 to 0.05 by increments of 0.002 for the PBMC, adipose, and tonsil references, and c_resolution equal to 0.0025 to 0.01 by increments of 0.0002 for the fetus reference, algorithm = 'Louvain', HVGs = 2000, downsample = 0 (assuming **main.R** has already been run for the default range at some point).
+  - Run file **main.R** with reference equal to each of the benchmark dataset values ('PBMC', 'Adipose', 'Tonsil', 'Fetus'), with c_resolution equal to 0.005 to 0.05 by increments of 0.002 for the PBMC, adipose, and tonsil references, and c_resolution equal to 0.0025 to 0.01 by increments of 0.0002 for the fetus reference, algorithm = 'Louvain', HVGs = 2000, downsample = 0 (assuming the results from running **main.R** for the default resolution range already exist).
   - Run file **metrics.R** with algorithm = 'Louvain', HVGs = 2000, is_res_range_small = TRUE.
   - Run file **Metric Plot.R** with algorithm = 'Louvain', HVGs = 2000, is_res_range_smalls = c(TRUE, TRUE), evaluation_types = 'cell type'.  This will produce Fig. S5 and S6.
 
