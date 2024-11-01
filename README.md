@@ -38,7 +38,7 @@ To reproduce Fig. S1 through S4:
       - algorithm = 'SLM', HVGs = 2000
       - algorithm = 'Louvain', HVGs = 1000
       - algorithm = 'Louvain', HVGs = 3000
-  - Do:
+  - Change the above algorithm and HVGs setting for each of the the following and:
       - Run file **main.R** with reference equal to each of the benchmark dataset values ('PBMC', 'Adipose', 'Tonsil', 'Fetus'), with c_resolution equal to each value of the default resolution range (0.015 to 0.15 by 0.005 increments), downsample = 0
       - Run file **metrics.R** with is_res_range_small = FALSE
       - Run file **Metric Plot.R** with is_res_range_smalls = FALSE, evaluation_types = 'cell type'.
