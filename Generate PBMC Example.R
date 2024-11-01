@@ -1,5 +1,5 @@
 # This code generates heatmap plots for recursive and seurat equivalent cluster purity results for two annotation levels
-# This code will reproduce figure 2, if main has been run with c_resolution = 0.02 and reference_name = "human_PBMC/"
+# This code will reproduce figure 2, if main has been run with c_resolution = 0.025 and reference_name = "PBMC"
 # Load the libraries from main first before running
 
 library(showtext)
@@ -190,6 +190,11 @@ if (!is_helmsley) {
   }
 }
 
+# Close all existing graphics devices
+graphics.off()
+# Redirect plots to the null device
+pdf(file = nullfile())
+
 temp = ggarrange(plot_list[['Iterative']][[1]],
                  plot_list[['Iterative']][[2]],
                  plot_list[['Seurat Equivalent']][[1]],
@@ -208,11 +213,12 @@ temp2 = annotate_figure(temp,
                                          rot = 90, size = 14, family = "narrow", face = "bold", hjust = 0.475)
 )
 
-suppressMessages(ggsave(filename = paste0('PBMC example heatmaps.png'), width = 10, height = 11, plot = temp2, device = 'png', dpi = 400))
-pp1 <- image_read(paste0('PBMC example heatmaps.png'))
+suppressMessages(ggsave(filename = paste0('PBMC example heatmaps ', c_resolution, '.png'), width = 10, height = 11, plot = temp2, device = 'png', dpi = 400))
+pp1 <- image_read(paste0('PBMC example heatmaps ', c_resolution, '.png'))
 pp1 <- image_scale(pp1, "50%")
-image_write(pp1, paste0('PBMC example heatmaps.eps'), format = 'eps')
+image_write(pp1, paste0('PBMC example heatmaps ', c_resolution, '.pdf'), format = 'pdf')
+image_write(pp1, paste0('PBMC example heatmaps ', c_resolution, '.eps'), format = 'eps')
 
-
-
+sprintf("%0.1f%%", (mean_values_list$`Iterative mean`$`annotation level 1`$`Cell Type Mean Cluster Purity`/mean_values_list$`Seurat Equivalent mean`$`annotation level 1`$`Cell Type Mean Cluster Purity`-1) * 100)
+sprintf("%0.1f%%", (mean_values_list$`Iterative mean`$`annotation level 2`$`Cell Type Mean Cluster Purity`/mean_values_list$`Seurat Equivalent mean`$`annotation level 2`$`Cell Type Mean Cluster Purity`-1) * 100)
 

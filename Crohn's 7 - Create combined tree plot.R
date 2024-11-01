@@ -3,6 +3,7 @@
 
 library(magick)
 library(gridExtra)
+graphics.off()
 
 image_list = list()
 
@@ -41,4 +42,9 @@ grid_layout <- grid.arrange(image_list[[1]], lineGrob, image_list[[2]], image_li
                             widths = c(10, 1, 10), ncol = 3, top = "             Abundance                                  Differential Gene Expression")
 
 ggsave("combined_images.png", grid_layout, width=6, height=9.2, dpi = 500)
-image_write(image_trim(image_read(paste0("combined_images.png"), strip = TRUE)), paste0("combined_images.eps"), format = 'eps')
+
+pp1 <- image_trim(image_read(paste0("combined_images.png"), strip = TRUE))
+# pp1 <- image_scale(pp1, "75%")
+image_write(pp1, paste0("combined_images.eps"), format = 'eps')
+image_write(pp1, paste0("combined_images.pdf"), format = 'pdf')
+

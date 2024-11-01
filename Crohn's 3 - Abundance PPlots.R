@@ -1,6 +1,21 @@
 # Code for creating heirarchically structured heat map plots for patient abundance Crohn's scRNA-seq data analysis
 # The Crohn's dataset is not currently publicly available
 
+# Abundance
+annotation_colors = list()
+annotation_colors[['CTRL vs TN-CD']][['cRc7c0']] = "#ff00a0" # higher vs parents
+
+annotation_colors[['CTRL vs CD']][['cRc3c0']] = "#55ff00" # higher vs children
+# annotation_colors[['CTRL vs CD']][['cRc0c1c1']] = "#ff00a0" # higher vs parents
+# annotation_colors[['CTRL vs CD']][['cRc4c3c1']] = "#ff00a0" # higher vs parents
+annotation_colors[['CTRL vs CD']][['cRc3']] = "#ff8c00" # consistent
+annotation_colors[['CTRL vs CD']][['cRc6']] = "#ff8c00" # consistent
+
+annotation_colors[['TN-CD vs CD']][['cRc3c0']] = "#55ff00" # higher vs children
+# annotation_colors[['TN-CD vs CD']][['cRc0c1']] = "#ff00a0" # higher vs parents
+annotation_colors[['TN-CD vs CD']][['cRc3']] = "#ff8c00" # consistent
+annotation_colors[['TN-CD vs CD']][['cRc8']] = "#ff8c00" # consistent
+
 
 p_value_table_plots_final = list()
 abundance_tree_plot_list = list()
@@ -36,7 +51,8 @@ for (level in 2){
           scale_y_discrete() +
           theme(axis.text.x = element_text(angle = 0, vjust = 0.35, size = 14), axis.text.y = element_text(size = 12, family = "mono"), axis.title=element_text(size=14,face="bold"), title = element_text(size=15))
       #print(p_value_table_plots_final[[level_name]][[test]][[paste0(alpha)]])
-      GetRadialTreeFromDataframe(df = temp_m, tree_comparisons = c('CTRL vs TN-CD', 'CTRL vs CD', 'TN-CD vs CD'), val_name = 'P.value', tree_level = level, gravities = c('NorthEast', 'NorthEast', 'NorthEast'))
+
+      GetRadialTreeFromDataframe(df = temp_m, tree_comparisons = c('CTRL vs TN-CD', 'CTRL vs CD', 'TN-CD vs CD'), val_name = 'P.value', tree_level = level, gravities = c('NorthEast', 'NorthEast', 'NorthEast'), annotation_colors = annotation_colors)
 
     }
   }

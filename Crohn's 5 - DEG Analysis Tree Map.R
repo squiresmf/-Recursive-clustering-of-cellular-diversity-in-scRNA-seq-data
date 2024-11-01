@@ -1,6 +1,24 @@
 # Code for creating heirarchically structured heat map plots for DEG Crohn's scRNA-seq data analysis
 # The Crohn's dataset is not currently publicly available
 
+
+# DEG Analysis
+annotation_colors = list()
+# annotation_colors[["control vs treatment naive-CD"]][['cRc0c1c1']] = "#ff00a0" # higher vs parents
+annotation_colors[["control vs treatment naive-CD"]][['cRc2c1c0']] = "#ff00a0" # higher vs parents
+annotation_colors[["control vs treatment naive-CD"]][['cRc7c0']] = "#ff00a0" # higher vs parents
+annotation_colors[["control vs treatment naive-CD"]][['cRc1']] = "#ff8c00" # consistent
+annotation_colors[["control vs treatment naive-CD"]][['cRc2']] = "#ff8c00" # consistent
+
+annotation_colors[["control vs CD"]][['cRc6']] = "#55ff00" # higher vs children
+annotation_colors[["control vs CD"]][['cRc0c1c1']] = "#ff00a0" # higher vs parents
+# annotation_colors[["control vs CD"]][['cRc0c1c1']] = "#ff00a0" # higher vs parents
+
+# annotation_colors[["treatment naive-CD vs CD"]][['cRc4c3']] = "#55ff00" # higher vs children
+annotation_colors[["treatment naive-CD vs CD"]][['cRc1']] = "#55ff00" # higher vs children
+# annotation_colors[["treatment naive-CD vs CD"]][['cRc2c2']] = "#ff00a0" # higher vs parents
+
+
 phenotype_test_DEGs_list = list()
 phenotype_test_DEGs_unfiltered = list()
 n_trials = 300
@@ -56,11 +74,11 @@ for (cluster_name in names(phenotype_test_DEGs_unfiltered)) {
 
 
 phenotype_test_DEGs_df = as.data.frame(do.call(cbind, phenotype_test_DEGs_df_lists))
-GetRadialTreeFromDataframe(df = phenotype_test_DEGs_df, tree_comparisons = c("control vs treatment naïve-CD", "control vs CD", "treatment naïve-CD vs CD"), val_name = 'P.value', tree_level = 2, gravities = c('NorthEast', 'NorthEast', 'NorthEast'), title_extra = '_empirical')
-GetRadialTreeFromDataframe(df = phenotype_test_DEGs_df, tree_comparisons = c("control vs treatment naïve-CD", "control vs CD", "treatment naïve-CD vs CD"), val_name = 'DEGs', tree_level = 2, gravities = c('NorthEast', 'NorthEast', 'NorthEast'), title_extra = '_empirical_nofilter')
+GetRadialTreeFromDataframe(df = phenotype_test_DEGs_df, tree_comparisons = c("control vs treatment naive-CD", "control vs CD", "treatment naive-CD vs CD"), val_name = 'P.value', tree_level = 2, gravities = c('NorthEast', 'NorthEast', 'NorthEast'), title_extra = '_empirical')
+GetRadialTreeFromDataframe(df = phenotype_test_DEGs_df, tree_comparisons = c("control vs treatment naive-CD", "control vs CD", "treatment naive-CD vs CD"), val_name = 'DEGs', tree_level = 2, gravities = c('NorthEast', 'NorthEast', 'NorthEast'), title_extra = '_empirical_nofilter')
 phenotype_test_DEGs_df = phenotype_test_DEGs_df[c('Cluster', 'DEGs Filtered', 'comparison')]
 colnames(phenotype_test_DEGs_df) = c('Cluster', 'DEGs', 'comparison')
-GetRadialTreeFromDataframe(df = phenotype_test_DEGs_df, tree_comparisons = c("control vs treatment naïve-CD", "control vs CD", "treatment naïve-CD vs CD"), val_name = 'DEGs', tree_level = 2, gravities = c('NorthEast', 'NorthEast', 'NorthEast'), title_extra = '_empirical')
+GetRadialTreeFromDataframe(df = phenotype_test_DEGs_df, tree_comparisons = c("control vs treatment naive-CD", "control vs CD", "treatment naive-CD vs CD"), val_name = 'DEGs', tree_level = 2, gravities = c('NorthEast', 'NorthEast', 'NorthEast'), title_extra = '_empirical', annotation_colors = annotation_colors)
 
 print('DEG Analysis Tree Map')
 

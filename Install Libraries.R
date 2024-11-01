@@ -1,24 +1,254 @@
-# This code was able to install Suerat v4.2 as well as other libraries needed to reproduce the results of the 'Recursive clustering of cellular diversity in scRNA-seq' paper
-# This code worked with R version 4.0.5 on Windows 10 on 3/7/24
+# NOTE: IF you get "Error in download_version_url(package, version, repos, type): couldn't find package",
+# just run the code again, this message always seems to appear the first time running remotes::install_version
 
-install.packages('igraph', type = 'binary')
-install.packages(c('remotes', 'assertthat', 'magick', 'jsonlite', 'renv', 'showtext'))
-remotes::install_version('Matrix', version = '1.5.0')
-remotes::install_version('SeuratObject', version = '4.1.2')
+# NOTE: To install igraph in windows, you must run the following command as administrator in RTools first:
+# pacman -Sy mingw-w64-{i686,x86_64}-glpk mingw-w64-{i686,x86_64}-libxml2 mingw-w64-{i686,x86_64}-gmp
 
-library(renv)
-library(jsonlite)
+# Set environment variables for igraph required software
+if (.Platform$OS.type == "windows") {
+  Sys.setenv(GLPK_HOME = "$(MINGW_PREFIX)")
+}
 
-# The following uses renv to install only Seurat and SeuratDisk versions corresponding to the renv .lock file
-packages_to_install <- c('Seurat', 'SeuratDisk')
-lock_content <- fromJSON("renv.lock", flatten = TRUE)
-lock_content$Packages <- lock_content$Packages[names(lock_content$Packages) %in% packages_to_install]
-modified_lock_json <- toJSON(lock_content, auto_unbox = TRUE, pretty = TRUE)
-temp_lock_path <- tempfile(fileext = ".lock")
-writeLines(modified_lock_json, temp_lock_path)
-renv::restore(lockfile = temp_lock_path)
-unlink(temp_lock_path)
+if (.Platform$OS.type == "windows") {
+  install.packages(c('devtools', 'spam', 'spam64', 'showtext', 'ggpubr', 'mclust', 'aricode', 'magick'), type = "binary")
+} else {
+  install.packages(c('devtools', 'spam', 'spam64', 'showtext', 'ggpubr', 'mclust', 'aricode'))
+}
 
-install.packages(c('ggpubr', 'data.tree', 'networkD3', 'webshot'))
+library(devtools)
 
-remotes::install_version('Matrix', version = '1.5.1')
+remotes::install_github("mojaveazure/seurat-disk", upgrade = "never")
+remotes::install_github('cole-trapnell-lab/leidenbase', upgrade = "never")
+
+install_specific_version <- function(pkg, version) {
+  remotes::install_version(pkg, version = version, upgrade = "never")
+  installed_version <- as.character(packageVersion(pkg))
+  if (installed_version != version) {
+    stop(sprintf("Failed to install %s version %s. Installed version is %s.",
+                 pkg, version, installed_version))
+  } else {
+    message(sprintf("Successfully installed %s version %s.", pkg, version))
+  }
+}
+
+packages_to_install1 <- list(
+  #SeuratDisk = "0.0.0.9020",
+  # cli = "3.3.0",
+  # devtools = "2.4.3",
+  # remotes = "2.4.2",
+  Matrix = "1.5.1",
+  SeuratObject = "4.1.3",
+  uwot = "0.1.14",
+  igraph = "1.2.11",
+  Seurat = "4.2.1",
+  abind = "1.4.5",
+  askpass = "1.1",
+  base64enc = "0.1.3",
+  BH = "1.78.0.0",
+  bitops = "1.0.7",
+  brew = "1.0.7",
+  brio = "1.1.3",
+  bslib = "0.3.1",
+  cachem = "1.0.6",
+  callr = "3.7.0",
+  caTools = "1.18.2",
+  cli = "3.6.1",
+  clipr = "0.8.0",
+  cluster = "2.1.2",
+  colorspace = "2.0.2",
+  commonmark = "1.7",
+  cowplot = "1.1.1",
+  cpp11 = "0.4.2",
+  crayon = "1.4.2",
+  credentials = "1.3.2",
+  crosstalk = "1.2.0",
+  curl = "4.3.2",
+  data.table = "1.14.2",
+  deldir = "1.0.6",
+  desc = "1.4.1",
+  diffobj = "0.3.5",
+  digest = "0.6.29",
+  dplyr = "1.0.10",
+  dqrng = "0.3.0",
+  ellipsis = "0.3.2",
+  evaluate = "0.14",
+  fansi = "1.0.2",
+  farver = "2.1.0",
+  fastmap = "1.1.1",
+  fitdistrplus = "1.1.6",
+  FNN = "1.1.3",
+  fontawesome = "0.2.2",
+  fs = "1.5.2",
+  future = "1.23.0",
+  future.apply = "1.8.1",
+  generics = "0.1.1",
+  gert = "1.6.0",
+  ggplot2 = "3.3.5",
+  ggrepel = "0.9.1",
+  ggridges = "0.5.3",
+  gh = "1.3.0",
+  gitcreds = "0.1.1",
+  globals = "0.14.0",
+  glue = "1.6.1",
+  goftest = "1.2.3",
+  gplots = "3.1.1",
+  gridExtra = "2.3",
+  gtable = "0.3.0",
+  gtools = "3.9.2",
+  here = "1.0.1",
+  highr = "0.9",
+  htmltools = "0.5.4",
+  htmlwidgets = "1.5.4",
+  httpuv = "1.6.5",
+  httr = "1.4.2",
+  ica = "1.0.2",
+  ini = "0.3.1",
+  irlba = "2.3.5",
+  isoband = "0.2.5",
+  jquerylib = "0.1.4",
+  jsonlite = "1.7.3",
+  KernSmooth = "2.23.18",
+  knitr = "1.37",
+  labeling = "0.4.2",
+  later = "1.3.0",
+  lazyeval = "0.2.2",
+  leiden = "0.3.9",
+  lifecycle = "1.0.3",
+  listenv = "0.8.0",
+  lmtest = "0.9.39",
+  magrittr = "2.0.3",
+  matrixStats = "0.61.0",
+  memoise = "2.0.1",
+  mime = "0.12",
+  miniUI = "0.1.1.1",
+  munsell = "0.5.0",
+  openssl = "1.4.6",
+  parallelly = "1.30.0",
+  patchwork = "1.1.1",
+  pbapply = "1.5.0",
+  pillar = "1.8.1",
+  pkgbuild = "1.3.1",
+  pkgconfig = "2.0.3",
+  pkgload = "1.3.0",
+  plotly = "4.10.0",
+  plyr = "1.8.6",
+  png = "0.1.7",
+  polyclip = "1.10.0",
+  praise = "1.0.0",
+  prettyunits = "1.1.1",
+  processx = "3.5.3",
+  progressr = "0.10.0",
+  promises = "1.2.0.1",
+  ps = "1.6.0",
+  purrr = "0.3.4",
+  R6 = "2.5.1",
+  RANN = "2.6.1",
+  rappdirs = "0.3.3",
+  rcmdcheck = "1.4.0",
+  RColorBrewer = "1.1.2",
+  Rcpp = "1.0.8",
+  RcppAnnoy = "0.0.19",
+  RcppArmadillo = "0.10.7.5.0",
+  RcppEigen = "0.3.3.9.1",
+  RcppProgress = "0.4.2",
+  RcppTOML = "0.1.7",
+  rematch2 = "2.1.2",
+  reshape2 = "1.4.4",
+  reticulate = "1.23",
+  rlang = "1.1.1",
+  rmarkdown = "2.13",
+  ROCR = "1.0.11",
+  roxygen2 = "7.1.2",
+  rprojroot = "2.0.2",
+  RSpectra = "0.16.0",
+  rstudioapi = "0.13",
+  Rtsne = "0.15",
+  rversions = "2.1.1",
+  sass = "0.4.0",
+  scales = "1.1.1",
+  scattermore = "0.7",
+  sctransform = "0.3.5",
+  sessioninfo = "1.2.2",
+  shiny = "1.7.1",
+  sitmo = "2.0.2",
+  sourcetools = "0.1.7",
+  sp = "1.5.0",
+  spatstat.data = "3.1.2",
+  spatstat.explore = "3.3.2",
+  spatstat.geom = "3.3.3",
+  spatstat.random = "3.3.2",
+  spatstat.sparse = "3.1.0",
+  spatstat.univar = "3.0.1",
+  spatstat.utils = "3.1.0",
+  stringi = "1.7.6",
+  stringr = "1.4.0",
+  sys = "3.4",
+  systemfonts = "1.0.4",
+  tensor = "1.5",
+  testthat = "3.1.4",
+  tibble = "3.1.6",
+  tidyr = "1.1.4",
+  tidyselect = "1.1.1",
+  tinytex = "0.38",
+  usethis = "2.1.5",
+  utf8 = "1.2.2",
+  vctrs = "0.6.3",
+  viridisLite = "0.4.0",
+  waldo = "0.4.0",
+  whisker = "0.4",
+  withr = "2.4.3",
+  xfun = "0.30",
+  xml2 = "1.3.3",
+  xopen = "1.0.0",
+  xtable = "1.8.4",
+  yaml = "2.2.1",
+  zip = "2.2.0",
+  zoo = "1.8.9"
+)
+packages_to_install2 <- list(
+  assertthat = "0.2.1",
+  networkD3 = "0.4",
+  bit = "4.0.4",
+  bit64 = "4.0.5",
+  data.tree = "1.0.0",
+  dplyr = "1.0.7",
+  fastmap = "1.1.0",
+  glue = "1.6.0",
+  hdf5r = "1.3.5",
+  htmltools = "0.5.2",
+  lifecycle = "1.0.1",
+  lobstr = "1.1.1",
+  magick = "2.7.3",
+  magrittr = "2.0.1",
+  pillar = "1.6.4",
+  pryr = "0.1.5",
+  rlang = "1.0.2",
+  vctrs = "0.3.8",
+  webshot = "0.5.2",
+  cachem = "1.0.6",
+  cpp11 = "0.4.2",
+  digest = "0.6.29",
+  fs = "1.5.2",
+  generics = "0.1.1",
+  httpuv = "1.6.5",
+  later = "1.3.0",
+  leiden = "0.3.9",
+  pkgload = "1.2.4",
+  promises = "1.2.0.1",
+  purrr = "0.3.4",
+  Rcpp = "1.0.8",
+  scattermore = "0.7",
+  sctransform = "0.3.5",
+  usethis = "2.1.5"
+)
+
+for (pkg in names(packages_to_install1)) {
+  version <- packages_to_install1[[pkg]]
+  install_specific_version(pkg, version)
+}
+
+for (pkg in names(packages_to_install2)) {
+  version <- packages_to_install2[[pkg]]
+  install_specific_version(pkg, version)
+}
+

@@ -1,11 +1,14 @@
 # Code for for Crohn's scRNA-seq data DEG analysis
 # The Crohn's dataset is not currently publicly available
 
-patient_names = names(paths)
+patient_names = samples
 
+# patient_metadata <- read.csv(file = 'patient_metadata helmsley.csv', fileEncoding = "UTF-8-BOM", check.names = FALSE)
 
-# Using split to create the named list
-phenotype_patients = split(patient_metadata$`Sample ID`, patient_metadata$`Disease phenotype`)
+# # Using split to create the named list
+# phenotype_patients = split(patient_metadata$`Sample ID`, patient_metadata$`Disease phenotype`)
+
+phenotype_patients = split(samples, patient_disease)
 
 cluster_patient_average_gene_expression_filename = paste0("cluster_patient_average_gene_expression_", assay, "_", c_resolution, '_', DEG_cutoff, '_', entropy_cutoff, '_')
 cluster_comparison_gene_count_filename = paste0("cluster_comparison_gene_count_", assay, "_", c_resolution, '_', DEG_cutoff, '_', entropy_cutoff, '_')
@@ -32,7 +35,7 @@ for (seed_num in seq(0, 300)) {
         for (patient in patient_names) {
           cluster_bool = recursive_integrated$cR@meta.data[[level_name]] == cluster
           patient_bool = patient_ids == patient
-          cluster_patient_gene_counts_by_cell = data@assays$RNA@data[recursive_integrated$cR@assays$integrated@var.features, cluster_bool & patient_bool]
+          cluster_patient_gene_counts_by_cell = recursive_integrated$cR@assays$RNA@data[recursive_integrated$cR@assays$integrated@var.features, cluster_bool & patient_bool]
           if (sum(cluster_bool & patient_bool) >= 3) {
             cluster_patient_mean_gene_counts = unname(rowMeans(cluster_patient_gene_counts_by_cell))
             cluster_patient_average_gene_expression[[cluster]][[patient]] = cluster_patient_mean_gene_counts
@@ -63,7 +66,7 @@ for (seed_num in seq(0, 300)) {
       level_name = paste0('level_', level)
       if (level < 3) {
         print(cluster)
-        for (comparison in list("control vs treatment naïve-CD", "control vs CD", "treatment naïve-CD vs CD")) {
+        for (comparison in list("control vs treatment naive-CD", "control vs CD", "treatment naive-CD vs CD")) {
           comparison_split = strsplit(comparison, ' vs ')[[1]]
           cluster_comparison_gene_count[[cluster]][[comparison]] = 0
           for (gene in recursive_integrated$cR@assays$integrated@var.features) {
@@ -119,12 +122,12 @@ for (seed_num in seq(0, 300)) {
 
   df_for_multilevel = flatten_list(cluster_comparison_gene_count)
   colnames(df_for_multilevel) = c('Cluster', 'comparison', 'DEGs')
-
-  GetRadialTreeFromDataframe(df = df_for_multilevel, tree_comparisons = c("control vs treatment naïve-CD", "control vs CD", "treatment naïve-CD vs CD"), val_name = 'DEGs', tree_level = 2, gravities = c('NorthEast', 'NorthEast', 'NorthEast'), title_extra = seed_num)
-
+  if (seed_num <= 1) {
+    GetRadialTreeFromDataframe(df = df_for_multilevel, tree_comparisons = c("control vs treatment naive-CD", "control vs CD", "treatment naive-CD vs CD"), val_name = 'DEGs', tree_level = 2, gravities = c('NorthEast', 'NorthEast', 'NorthEast'), title_extra = seed_num)
+  }
   if (seed_num == 0) {
     df_for_multilevel_patient = flatten_list(cluster_comparison_patient_count)
     colnames(df_for_multilevel_patient) = c('Cluster', 'comparison', 'Samples')
-    GetRadialTreeFromDataframe(df = df_for_multilevel_patient, tree_comparisons = c("control vs treatment naïve-CD", "control vs CD", "treatment naïve-CD vs CD"), val_name = 'Samples', tree_level = 2, gravities = c('NorthEast', 'NorthEast', 'NorthEast'))
+    GetRadialTreeFromDataframe(df = df_for_multilevel_patient, tree_comparisons = c("control vs treatment naive-CD", "control vs CD", "treatment naive-CD vs CD"), val_name = 'Samples', tree_level = 2, gravities = c('NorthEast', 'NorthEast', 'NorthEast'))
   }
 }

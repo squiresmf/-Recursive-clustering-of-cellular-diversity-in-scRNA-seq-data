@@ -1,23 +1,24 @@
 # Code for calculating patient abundance values and related plots for Crohn's scRNA-seq data analysis
 # The Crohn's dataset is not currently publicly available
 
-patient_names = names(paths)
+patient_names = samples
 num_cells_patient = list()
 for (patient_name in patient_names) {
   num_cells_patient[[patient_name]] = sum(integrated_data@meta.data$patient == patient_name)
 }
 
-pairs = list(list("control", "CD"), list("control", "treatment naïve-CD"), list("CD", "treatment naïve-CD"))
-#pairs = list(list("control", "CD"), list("control", "treatment naïve-CD"), list("CD", "treatment naïve-CD"),
-#             list("control", c("CD", "treatment naïve-CD")), list("CD", c("control", "treatment naïve-CD")), list("treatment naïve-CD", c("control", "CD")))
+pairs = list(list("control", "CD"), list("control", "treatment naive-CD"), list("CD", "treatment naive-CD"))
+#pairs = list(list("control", "CD"), list("control", "treatment naive-CD"), list("CD", "treatment naive-CD"),
+#             list("control", c("CD", "treatment naive-CD")), list("CD", c("control", "treatment naive-CD")), list("treatment naive-CD", c("control", "CD")))
 var_names = c('CTRL vs CD', 'CTRL vs TN-CD', 'TN-CD vs CD')
 #var_names = c('CTRL vs CD', 'CTRL vs TN-CD', 'TN-CD vs CD', 'CTRL vs CD+TN-CD', 'CD vs CTRL+TN-CD', 'TN-CD vs CTRL+CD')
 
 tests = c('t', 'wilcox')
 
-patient_ids = names(paths)
-disease_phenotypes = patient_metadata$'Disease phenotype'
-
+patient_ids = samples
+disease_phenotypes = patient_disease
+use_annotations = FALSE
+adjusting = 'unadjusted'
 for (dataset_name in names(recursive_integrated)) {
   print(dataset_name)
   cluster_nums = as.numeric(levels(recursive_integrated[[dataset_name]]@meta.data$seurat_clusters))
@@ -97,7 +98,7 @@ for (cluster_type in c('iterative')) {
         } else {
           boxplot_df = boxplot_temp_fracs_melted
         }
-        boxplot_df$Phenotype <- factor(boxplot_df$Phenotype, levels = c("CD", "treatment naïve-CD", "control"))
+        boxplot_df$Phenotype <- factor(boxplot_df$Phenotype, levels = c("CD", "treatment naive-CD", "control"))
         plot = ggplot(boxplot_df, aes(x = Cluster, y = Abundance, color = Phenotype)) +
           geom_boxplot(outlier.shape = NA) +
           geom_point(position = position_jitterdodge()) +

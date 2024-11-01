@@ -1,19 +1,7 @@
 # The main code for applying recursive clustering and single-pass equivalent clustering
-# To run, choose a recursive clustering resolution parameter c_resolution and a dataset reference_name
+# To run, choose a recursive clustering resolution parameter c_resolution and a dataset reference
 
-#####################################################################################
-c_resolution = 0.02 # Recursive Clustering resolution parameter
-
-# Specify which reference data to use
-reference_name = "human_PBMC/"
-# reference_name = "human_adipose/"
-# reference_name = "human_tonsil/"
-# reference_name = "human_fetus/"
-
-is_helmsley = FALSE #If FALSE, use a benchmark reference dataset, if TRUE, use the Chron's disease dataset
-#####################################################################################
-
-# These are the all libraries needed to run all code across all files
+# These are the all libraries needed to run code across all files
 library(Matrix)
 library(Seurat)
 library(ggplot2)
@@ -31,21 +19,102 @@ library(magick)
 library("png")
 library(stringi)
 library(SeuratDisk)
+library(igraph)
+library(future)
+library(future.apply)
+# library(pryr) # mem_used()
 
-# Other parameters
-do_integrate = FALSE
-assay = 'integrated'
-DEG_cutoff = 0
-if (is_helmsley) {
-  entropy_cutoff = 0.5
+################################################  Paper Parameters  ##########################################################
+#If Helmsley, use the Chron's disease dataset, otherwise use a benchmark reference dataset,
+# reference = 'PBMC'
+# reference = 'Adipose'
+# reference = 'Tonsil'
+# reference = 'Fetus'
+reference = 'Helmsley'
+
+# The recursive clustering resolution parameter
+# c_resolution = 0.025
+c_resolution = 0.1
+
+# Change these parameters for the supplementary section 1 figures
+algorithm = 'Louvain'
+# algorithm = 'Leiden'
+# algorithm = 'SLM'
+HVGs = 2000
+# HVGs = 1000
+# HVGs = 3000
+
+# downsample = 0 is no downsampling, the default
+# Run for downsample = 1 through downsample = 5 with other parameters as default for the supplementary section 4 figures
+downsample = 0
+
+if (reference == 'Helmsley') {
+  entropy_cutoff = 0.5 # This is the default entropy cutoff parameter for section 2.3 results
+  # entropy_cutoff = 0 # Use the entropy cutoff parameter of 0 to generate the full clustering used in supplementary section 5
 } else {
   entropy_cutoff = 0
 }
-do_lower_clusters_higher_UMAP = FALSE
-m_level = 3
+####################################################################################################################################
 
-options(future.globals.maxSize = 20000 * 1024^2)
+# Other parameters
+assay = 'integrated'
+DEG_cutoff = 0
+fvf.nfeatures = HVGs
 
+if (reference == 'Helmsley') {
+  is_helmsley = TRUE
+} else {
+  is_helmsley = FALSE
+}
+
+fvf.nfeatures = HVGs
+name_extra = ""
+if (algorithm != 'Louvain') {
+  name_extra = paste(name_extra, algorithm)
+}
+if (HVGs != 2000) {
+  name_extra = paste(name_extra, HVGs, 'HVG')
+}
+if (fvf.nfeatures != 2000) {
+  name_extra = paste(name_extra, fvf.nfeatures, 'fvf.nfeatures')
+}
+if (downsample != 0) {
+  name_extra = paste(name_extra, 'Downsample', downsample)
+}
+if (entropy_cutoff != 0) {
+  name_extra = paste(name_extra, 'entropy_cutoff', entropy_cutoff)
+}
+
+current_dir = ""
+if (.Platform$OS.type == "windows") {
+  current_dir = paste0(current_dir, 'Y:')
+}
+current_dir = paste0(current_dir, '/qiu-lab/Michael Recursive Clustering/')
+# current_dir <- getwd()
+
+SetDirRead <- function() {
+  setwd_path = current_dir
+  setwd(setwd_path)
+}
+
+SetDirWrite <- function() {
+  setwd_path = current_dir
+  if (name_extra == "") {
+    setwd_path = paste0(setwd_path, 'Default/', reference)
+  } else {
+    setwd_path = paste0(setwd_path, trimws(name_extra), '/', reference, name_extra)
+  }
+  if (!dir.exists(setwd_path)) {
+    dir.create(setwd_path, recursive = TRUE)
+  }
+  setwd(setwd_path)
+}
+
+reference_name = paste0("human_", reference, "/")
+do_lower_clusters_higher_UMAP = TRUE
+m_level = 2
+
+options(future.globals.maxSize = 128 * 1024^3)
 # A function to make strings the same length by padding with spaces
 PadRight <- function(value, width, side = "right", pad = " ") {
   if (is.numeric(value)) {
@@ -70,167 +139,252 @@ PadRight <- function(value, width, side = "right", pad = " ") {
   return(string)
 }
 
-paths = list()
-data = list()
+# Run Leiden clustering algorithm using leidenbase package
+RunLeidenCustom <- function(
+  object,
+  method = c("matrix"),
+  partition.type = c(
+    'RBConfigurationVertexPartition',
+    'ModularityVertexPartition',
+    'RBERVertexPartition',
+    'CPMVertexPartition',
+    'MutableVertexPartition',
+    'SignificanceVertexPartition',
+    'SurpriseVertexPartition'
+  ),
+  initial.membership = NULL,
+  node.sizes = NULL,
+  resolution.parameter = 1,
+  random.seed = 0,
+  n.iter = 10,
+  verbose = FALSE
+) {
+  t_mat_sparse = t(object)
+  weights <- t_mat_sparse[which(t_mat_sparse != 0)]
+  t_mat_sparse = NULL
 
-if (is_helmsley) {
-  paths[['GCA1']] = 'raw_count_data/first_batch_13_libraries_CellRanger_filtered/GCA1_prot_01788_5GEX_C7/'
-  paths[['GCA2']] = 'raw_count_data/first_batch_13_libraries_CellRanger_filtered/GCA2_prot_21394_5GEX_C5/'
-  paths[['GCA3']] = 'raw_count_data/first_batch_13_libraries_CellRanger_filtered/GCA3_prot_21460_5GEX_D5/'
-  paths[['GCA5']] = 'raw_count_data/first_batch_13_libraries_CellRanger_filtered/GCA5_prot_21478_5GEX_H5/'
-  paths[['GCA7']] = 'raw_count_data/second_batch_8_libraries_CellRanger_filtered/GCA7/'
-  paths[['GCA8']] = 'raw_count_data/second_batch_8_libraries_CellRanger_filtered/GCA8/'
-  paths[['GCA9']] = 'raw_count_data/second_batch_8_libraries_CellRanger_filtered/GCA9/'
-  paths[['GCA10']] = 'raw_count_data/second_batch_8_libraries_CellRanger_filtered/GCA10/'
-  paths[['GCA11']] = 'raw_count_data/second_batch_8_libraries_CellRanger_filtered/GCA11/'
-  paths[['GCA12']] = 'raw_count_data/second_batch_8_libraries_CellRanger_filtered/GCA12/'
-  paths[['GCA13']] = 'raw_count_data/second_batch_8_libraries_CellRanger_filtered/GCA13/'
-  paths[['GCA14']] = 'raw_count_data/second_batch_8_libraries_CellRanger_filtered/GCA14/'
-  paths[['GCA15']] = 'raw_count_data/third_batch_8_libraries_CellRanger_filtered/GCA15/filtered_feature_bc_matrix/'
-  paths[['GCA16']] = 'raw_count_data/third_batch_8_libraries_CellRanger_filtered/GCA16/filtered_feature_bc_matrix/'
-  paths[['GCA17']] = 'raw_count_data/third_batch_8_libraries_CellRanger_filtered/GCA17/filtered_feature_bc_matrix/'
-  paths[['GCA18']] = 'raw_count_data/third_batch_8_libraries_CellRanger_filtered/GCA18/filtered_feature_bc_matrix/'
-  paths[['GCA19']] = 'raw_count_data/third_batch_8_libraries_CellRanger_filtered/GCA19/filtered_feature_bc_matrix/'
-  paths[['GCA20']] = 'raw_count_data/third_batch_8_libraries_CellRanger_filtered/GCA20/filtered_feature_bc_matrix/'
-  paths[['GCA21']] = 'raw_count_data/third_batch_8_libraries_CellRanger_filtered/GCA21/filtered_feature_bc_matrix/'
-  paths[['GCA22']] = 'raw_count_data/third_batch_8_libraries_CellRanger_filtered/GCA22/filtered_feature_bc_matrix/'
-  paths[['GCA23']] = 'raw_count_data/batch_4/Helmsley Batch 4/p21063-s001_GCA23_5GEX_C12/filtered_feature_bc_matrix/'
-  paths[['GCA24']] = 'raw_count_data/batch_4/Helmsley Batch 4/p21063-s002_GCA24_5GEX_D12/filtered_feature_bc_matrix/'
-  paths[['GCA25']] = 'raw_count_data/batch_4/Helmsley Batch 4/p21063-s003_GCA25_5GEX_E12/filtered_feature_bc_matrix/'
-  paths[['GCA26']] = 'raw_count_data/batch_4/Helmsley Batch 4/p21063-s004_GCA26_5GEX_F12/filtered_feature_bc_matrix/'
-  paths[['GCA27']] = 'raw_count_data/batch_4/Helmsley Batch 4/p21063-s005_GCA27_5GEX_G12/filtered_feature_bc_matrix/'
-  paths[['GCA28']] = 'raw_count_data/batch_4/Helmsley Batch 4/p21063-s006_GCA28_5GEX_H12/filtered_feature_bc_matrix/'
-  paths[['GCA29']] = 'raw_count_data/batch_4/Helmsley Batch 4/p21063-s007_GCA29_5GEX_E2/filtered_feature_bc_matrix/'
-}
-disease_phenotype_names = c("control", "treatment naïve-CD", "CD")
+  input <- graph_from_adjacency_matrix(adjmatrix = object, weighted = TRUE)
 
-if (is_helmsley) {
-  patient_metadata <- read.csv(file = 'patient_metadata helmsley.csv', fileEncoding = "UTF-8-BOM", check.names = FALSE)
-  row.names(patient_metadata) <- patient_metadata$'Sample ID'
-  data_filename = 'data.rds'
-  ref_name = paste0('helmsley', '_', assay, '_')
-} else {
-  ref_name = paste0(strsplit(reference_name, '/')[[1]], '_', assay, '_')
-  data_filename = paste0(strsplit(reference_name, '/')[[1]], '_', 'RNA', '_', 'ref_data', '.rds')
+  #run leiden from leidenbase
+  p <- leidenbase::leiden_find_partition(igraph = input,
+                                         initial_membership = initial.membership,
+                                         edge_weights = weights,
+                                         node_sizes = node.sizes,
+                                         resolution_parameter = resolution.parameter,
+                                         seed = random.seed + 1, # leidenbase requires seed >= 1
+                                         verbose = verbose,
+                                         partition_type = partition.type,
+                                         num_iter = n.iter)
+  partition <- p$membership
+  return(partition)
 }
 
-if (!is_helmsley) {
-  if (reference_name == "human_PBMC/") {
-    annotation_levels = 3
-  }
-  if (reference_name == "human_tonsil/") {
-    annotation_levels = 3
-  }
-  if (reference_name == "human_fetus/") {
-    annotation_levels = 2
-  }
-  if (reference_name == "human_adipose/") {
-    annotation_levels = 2
-  }
-}
+assignInNamespace("RunLeiden", RunLeidenCustom, ns = "Seurat")
 
+# When HVGs are 3000 and reference is PBMC, we need to overwrite default integration functions to
+# use the spam dgCMatrix instead of the default dgCMatrix data structure due to the fact that the
+# default cannot hold more than 2^32-1 non-zero elements, which PBMC with 3000 HVGs exceeds
+if (HVGs == 3000 && reference == 'PBMC') {
 
-# Create the initial reference dataset seurat objects from output of Azimuth snakemake files
-if (!file.exists(data_filename)) {
-  if (is_helmsley) {
-    patient_ids = names(paths)
-    for (patient_id in patient_ids) {
-      print(patient_id)
-      data[[patient_id]] <- CreateSeuratObject(counts = Read10X(data.dir = paths[[patient_id]], gene.column = 2))
+  FindIntegrationMatrixCustom <- function(object, assay = NULL, integration.name = "integrated",
+                                          features.integrate = NULL, verbose = TRUE) {
+
+    assay <- assay %||% Seurat::DefaultAssay(object = object)
+    neighbors <- Seurat::GetIntegrationData(object = object, integration.name = integration.name,
+                                            slot = "neighbors")
+    nn.cells1 <- neighbors$cells1
+    nn.cells2 <- neighbors$cells2
+    anchors <- Seurat::GetIntegrationData(object = object, integration.name = integration.name,
+                                          slot = "anchors")
+    if (verbose) {
+      message("Finding integration vectors")
     }
-  } else {
-    if (reference_name == "human_PBMC/") {
-      data <- LoadH5Seurat("azimuth-references/human_pbmc/data/pbmc_multimodal.h5seurat")
-      temp = CreateSeuratObject(data@assays$SCT@counts, assay = "RNA")
-      data@assays$RNA = temp@assays$RNA
-      data = AddMetaData(object = data, metadata = data@meta.data$orig.ident, col.name = 'patient')
-      for (metadata_name in names(data@meta.data)) {
-        if (!(metadata_name %in% c('patient', 'nCount_RNA', 'nFeature_RNA', 'celltype.l1', 'celltype.l2', 'celltype.l3'))) {
-          data@meta.data[[metadata_name]] = NULL
-        }
+
+    features.integrate <- features.integrate %||% rownames(x = Seurat::GetAssayData(object = object,
+                                                                                    assay = assay, slot = "data"))
+    data.use1 <- t(x = Seurat::GetAssayData(object = object, assay = assay, slot = "data")[features.integrate, nn.cells1])
+    data.use2 <- t(x = Seurat::GetAssayData(object = object, assay = assay, slot = "data")[features.integrate, nn.cells2])
+    anchors1 <- nn.cells1[anchors[, "cell1"]]
+    anchors2 <- nn.cells2[anchors[, "cell2"]]
+
+    # Original Seurat code
+    # data.use1 <- data.use1[anchors1,]
+    # data.use2 <- data.use2[anchors2,]
+    # integration.matrix <- data.use2 - data.use1
+
+    # Modified code to use the spam data structure (source https://github.com/satijalab/seurat/compare/master...zhanghao-njmu:seurat:master)
+    ##############################################################################
+    overflow <- length(anchors1) * as.numeric(ncol(data.use1)) / (2^31 - 1)
+    if (overflow > 1) {
+      suppressPackageStartupMessages(require("spam"))
+      suppressPackageStartupMessages(require("spam64"))
+      chunks <- sort((1:ncol(data.use1)) %% ceiling(overflow))
+      data.use1 <- do.call(cbind, lapply(unique(chunks), function(ck) spam::as.spam.dgCMatrix(data.use1[anchors1, chunks == ck])))
+      data.use2 <- do.call(cbind, lapply(unique(chunks), function(ck) spam::as.spam.dgCMatrix(data.use2[anchors2, chunks == ck])))
+    } else {
+      data.use1 <- data.use1[anchors1,]
+      data.use2 <- data.use2[anchors2,]
+    }
+
+    overflow <- as.numeric(length(data.use1) * 2) / (2^31 - 1)
+    if (overflow > 1 && !inherits(data.use1, "spam")) {
+      chunks <- sort((1:ncol(data.use1)) %% ceiling(overflow))
+      integration.matrix <- do.call(cbind, lapply(unique(chunks), function(ck) data.use2[, chunks == ck] - data.use1[, chunks == ck]))
+    } else {
+      integration.matrix <- data.use2 - data.use1
+    }
+
+    if (inherits(integration.matrix, "spam")) {
+      attr(integration.matrix, "rownames") <- anchors2
+      attr(integration.matrix, "colnames") <- features.integrate
+    }
+    # end modified code
+    #####################################################################################
+
+    object <- Seurat::SetIntegrationData(object = object, integration.name = integration.name,
+                                         slot = "integration.matrix", new.data = integration.matrix)
+    return(object)
+  }
+
+  assignInNamespace("FindIntegrationMatrix", FindIntegrationMatrixCustom, ns = "Seurat")
+
+  FindWeightsCustom <- function(object, reduction = NULL, assay = NULL, integration.name = "integrated",
+                                dims = 1:10, features = NULL, k = 300, sd.weight = 1, nn.method = "annoy",
+                                n.trees = 50, eps = 0, reverse = FALSE, verbose = TRUE)
+  {
+    if (verbose) {
+      message("Finding integration vector weights")
+    }
+    if (is.null(x = reduction) & is.null(x = features)) {
+      stop("Need to specify either dimension reduction object or a set of features")
+    }
+    assay <- assay %||% Seurat::DefaultAssay(object = object)
+    neighbors <- Seurat::GetIntegrationData(object = object, integration.name = integration.name,
+                                            slot = "neighbors")
+    nn.cells1 <- neighbors$cells1
+    nn.cells2 <- neighbors$cells2
+    anchors <- Seurat::GetIntegrationData(object = object, integration.name = integration.name,
+                                          slot = "anchors")
+    if (reverse) {
+      anchors.cells2 <- nn.cells2[anchors[, "cell2"]]
+      anchors.cells1 <- nn.cells1[anchors[, "cell1"]]
+      to.keep <- !duplicated(x = anchors.cells1)
+      anchors.cells1 <- anchors.cells1[to.keep]
+      anchors.cells2 <- anchors.cells2[to.keep]
+      if (is.null(x = features)) {
+
+        data.use <- Seurat::Embeddings(object = reduction)[nn.cells1,
+                                                           dims]
+        data.use.query <- Seurat::Embeddings(object = reduction)[nn.cells2,
+                                                                 dims]
       }
-    }
-    if (reference_name == "human_tonsil/") {
-      data2 <- readRDS('azimuth-references/human_tonsil/data/obj.rds')
-      data = AddMetaData(object = data, metadata = data@meta.data$donor_id, col.name = 'patient')
-      data = AddMetaData(object = data, metadata = data@meta.data$annotation_level_1, col.name = 'celltype.l1')
-      data = AddMetaData(object = data, metadata = data@meta.data$annotation_figure_1, col.name = 'celltype.l2')
-      data = AddMetaData(object = data, metadata = data@meta.data$annotation_20220215, col.name = 'celltype.l3')
-      for (metadata_name in names(data@meta.data)) {
-        if (!(metadata_name %in% c('patient', 'nCount_RNA', 'nFeature_RNA', 'celltype.l1', 'celltype.l2', 'celltype.l3'))) {
-          data@meta.data[[metadata_name]] = NULL
-        }
+      else {
+        data.use <- t(x = Seurat::GetAssayData(object = object, slot = "data",
+                                               assay = assay)[features, nn.cells1])
+        data.use.query <- t(x = Seurat::GetAssayData(object = object,
+                                                     slot = "data", assay = assay)[features,
+                                                                                   nn.cells2])
       }
+      knn_2_2 <- Seurat:::NNHelper(data = data.use[anchors.cells1,],
+                                   query = data.use.query, k = k, method = nn.method,
+                                   n.trees = n.trees, eps = eps)
+
+
     }
-    if (reference_name == "human_fetus/") {
-      data3 <- readRDS('azimuth-references/human_fetus/seurat_objects/fullref.Rds')
-      data = AddMetaData(object = data, metadata = data@meta.data$Fetus_id, col.name = 'patient')
-      data = AddMetaData(object = data, metadata = data@meta.data$annotation.l1, col.name = 'celltype.l1')
-      data = AddMetaData(object = data, metadata = data@meta.data$annotation.l2, col.name = 'celltype.l2')
-      for (metadata_name in names(data@meta.data)) {
-        if (!(metadata_name %in% c('patient', 'nCount_RNA', 'nFeature_RNA', 'celltype.l1', 'celltype.l2', 'celltype.l3'))) {
-          data@meta.data[[metadata_name]] = NULL
-        }
+    else {
+      anchors.cells2 <- unique(x = nn.cells2[anchors[, "cell2"]])
+      if (is.null(x = features)) {
+        data.use <- Seurat::Embeddings(reduction)[nn.cells2, dims]
       }
-    }
-    if (reference_name == "human_adipose/") {
-      data4 <- readRDS('azimuth-references/human_adipose/full_reference.Rds')
-      data = AddMetaData(object = data, metadata = data@meta.data$Number, col.name = 'patient')
-      for (metadata_name in names(data@meta.data)) {
-        if (!(metadata_name %in% c('patient', 'nCount_RNA', 'nFeature_RNA', 'celltype.l1', 'celltype.l2'))) {
-          data@meta.data[[metadata_name]] = NULL
-        }
+      else {
+        data.use <- t(x = Seurat::GetAssayData(object = object, slot = "data",
+                                               assay = assay)[features, nn.cells2])
       }
+      knn_2_2 <- Seurat:::NNHelper(data = data.use[anchors.cells2,],
+                                   query = data.use, k = k, method = nn.method, n.trees = n.trees,
+                                   eps = eps)
     }
-    for (a in names(data@assays)) {
-      if (a != 'RNA') {
-        print(paste0('removing ', a))
-        data@assays[[a]] = NULL
-      }
-    }
-    DefaultAssay(data) = 'RNA'
-    data@graphs = list()
-    data@reductions = list()
-    data@commands = list()
-    data <- SplitObject(object = data, split.by = "patient")
-    patient_ids = names(data)
+
+    distances <- Seurat::Distances(object = knn_2_2)
+    distances <- 1 - (distances / distances[, ncol(x = distances)])
+    cell.index <- Seurat::Indices(object = knn_2_2)
+    integration.matrix <- Seurat::GetIntegrationData(object = object,
+                                                     integration.name = integration.name, slot = "integration.matrix")
+    weights <- Seurat:::FindWeightsC(cells2 = 0:(length(x = nn.cells2) -
+      1), distances = as.matrix(x = distances), anchor_cells2 = anchors.cells2,
+
+                                     # Original Seurat code
+                                     # integration_matrix_rownames = rownames(x = integration.matrix),
+
+                                     # Modified code to use the spam data structure (source https://github.com/satijalab/seurat/compare/master...zhanghao-njmu:seurat:master)
+                                     #####################################################################################
+                                     integration_matrix_rownames = rownames(x = integration.matrix) %||% attr(integration.matrix, "rownames"),
+                                     # end modified code
+                                     #####################################################################################
+                                     cell_index = cell.index, anchor_score = anchors[, "score"],
+                                     min_dist = 0, sd = sd.weight, display_progress = verbose)
+    object <- Seurat::SetIntegrationData(object = object, integration.name = integration.name,
+                                         slot = "weights", new.data = weights)
+    return(object)
   }
 
-  for (patient_id in patient_ids) {
-    cell_id = data[[patient_id]][['RNA']]@counts@Dimnames[[2]]
-    cell_num = seq(ncol(data[[patient_id]]))
-    data[[patient_id]] = AddMetaData(object = data[[patient_id]], metadata = cell_id, col.name = 'cell_id')
-    data[[patient_id]] = AddMetaData(object = data[[patient_id]], metadata = cell_num, col.name = 'cell_num')
+  assignInNamespace("FindWeights", FindWeightsCustom, ns = "Seurat")
 
-    data[[patient_id]] <- NormalizeData(data[[patient_id]])
-    data[[patient_id]] <- FindVariableFeatures(data[[patient_id]])
-
-    if (is_helmsley) {
-      # add patient metadata
-      patient = rep(patient_metadata[patient_id,]$'Sample ID', ncol(data[[patient_id]]))
-      disease_phenotype = rep(patient_metadata[patient_id,]$'Disease phenotype', ncol(data[[patient_id]]))
-      gender = rep(patient_metadata[patient_id,]$Sex, ncol(data[[patient_id]]))
-      batch = rep(patient_metadata[patient_id,]$'Batch #', ncol(data[[patient_id]]))
-      age = rep(patient_metadata[patient_id,]$Age, ncol(data[[patient_id]]))
-      race = rep(patient_metadata[patient_id,]$Race, ncol(data[[patient_id]]))
-
-      data[[patient_id]] = AddMetaData(object = data[[patient_id]], metadata = disease_phenotype, col.name = 'disease_phenotype')
-      data[[patient_id]] = AddMetaData(object = data[[patient_id]], metadata = gender, col.name = 'gender')
-      data[[patient_id]] = AddMetaData(object = data[[patient_id]], metadata = batch, col.name = 'batch')
-      data[[patient_id]] = AddMetaData(object = data[[patient_id]], metadata = age, col.name = 'age')
-      data[[patient_id]] = AddMetaData(object = data[[patient_id]], metadata = race, col.name = 'race')
-      data[[patient_id]] = AddMetaData(object = data[[patient_id]], metadata = patient, col.name = 'patient')
+  TransformDataMatrixCustom <- function(object, assay = NULL, new.assay.name = "integrated",
+                                        integration.name = "integrated", features.to.integrate = NULL,
+                                        reduction = "cca", verbose = TRUE)
+  {
+    if (verbose) {
+      message("Integrating data")
     }
+    assay <- assay %||% Seurat::DefaultAssay(object = object)
+    weights <- Seurat::GetIntegrationData(object = object, integration.name = integration.name,
+                                          slot = "weights")
+    integration.matrix <- Seurat::GetIntegrationData(object = object,
+                                                     integration.name = integration.name, slot = "integration.matrix")
+    neighbors <- Seurat::GetIntegrationData(object = object, integration.name = integration.name,
+                                            slot = "neighbors")
+    nn.cells1 <- neighbors$cells1
+    nn.cells2 <- neighbors$cells2
+    data.use1 <- t(x = Seurat::GetAssayData(object = object, assay = assay,
+                                            slot = "data")[features.to.integrate, nn.cells1])
+    data.use2 <- t(x = Seurat::GetAssayData(object = object, assay = assay,
+                                            slot = "data")[features.to.integrate, nn.cells2])
+
+    # Original Seurat code
+    # integrated <- IntegrateDataC(integration_matrix = as.sparse(x = integration.matrix),
+    #                              weights = as.sparse(x = weights), expression_cells2 = as.sparse(x = data.use2))
+
+    # Modified code to use the spam data structure (source https://github.com/satijalab/seurat/compare/master...zhanghao-njmu:seurat:master)
+    #####################################################################################
+    if (inherits(integration.matrix, "spam")) {
+      weights.spam <- spam::as.spam.dgCMatrix(as.sparse(weights))
+      data.use2.spam <- spam::as.spam.dgCMatrix(as.sparse(data.use2))
+      integrated <- data.use2.spam - t(weights.spam) %*% integration.matrix
+      integrated <- spam::as.dgCMatrix.spam(integrated)
+    } else {
+      getAnywhere(IntegrateDataC)
+      integrated <- Seurat:::IntegrateDataC(
+        integration_matrix = as.sparse(x = integration.matrix),
+        weights = as.sparse(x = weights),
+        expression_cells2 = as.sparse(x = data.use2)
+      )
+    }
+    # end modified code
+    #####################################################################################
+
+    dimnames(integrated) <- dimnames(data.use2)
+    new.expression <- t(rbind(data.use1, integrated))
+    new.expression <- new.expression[, colnames(object)]
+    new.assay <- new(Class = "Assay", counts = new(Class = "dgCMatrix"),
+                     data = new.expression, scale.data = matrix(), var.features = vector(),
+                     meta.features = data.frame(row.names = rownames(x = new.expression)),
+                     misc = NULL)
+    object[[new.assay.name]] <- new.assay
+    return(object)
   }
-  saveRDS(data, file = data_filename)
-} else {
-  data = readRDS(data_filename)
-}
 
-
-patient_ids = names(data)
-for (patient_id in patient_ids) {
-  DefaultAssay(data[[patient_id]]) = 'RNA'
+  assignInNamespace("TransformDataMatrix", TransformDataMatrixCustom, ns = "Seurat")
 }
 
 # The seurat clustering pipeline:
@@ -238,8 +392,7 @@ for (patient_id in patient_ids) {
 # - Perform principal components analysis (PCA) to reduce data dimensions
 # - Generate a shared nearest neighbor (SNN) graph based on the Euclidean distances of PCA embeddings of each cell
 # - Apply Louvain clustering on the SNN graph.
-
-FindSeuratClusters <- function(dataset, assay, resolution, rerun, random_seed = 0, savetime = FALSE, cluster_name = NULL, method_name = NULL) {
+FindSeuratClusters <- function(dataset, assay, resolution, rerun, random_seed = 0, savetime = TRUE, cluster_name = NULL, method_name = NULL) {
   if (savetime) {
     start.time <- Sys.time()
   }
@@ -260,44 +413,216 @@ FindSeuratClusters <- function(dataset, assay, resolution, rerun, random_seed = 
     dataset <- FindNeighbors(dataset, reduction = "pca", dims = 1:30, assay = assay, verbose = FALSE)
   }
   print('finding clusters')
-  dataset <- FindClusters(dataset, resolution = resolution, verbose = FALSE, random.seed = random_seed)
-
+  if (algorithm == 'Louvain') {
+    dataset <- FindClusters(dataset, resolution = resolution, verbose = FALSE, random.seed = random_seed)
+  }
+  if (algorithm == 'Leiden') {
+    dataset <- FindClusters(dataset, resolution = resolution, verbose = FALSE, random.seed = random_seed, algorithm = 4)
+  }
+  if (algorithm == 'SLM') {
+    dataset <- FindClusters(dataset, resolution = resolution, verbose = FALSE, random.seed = random_seed, algorithm = 3)
+  }
   if (savetime) {
     end.time <- Sys.time()
     time.taken <- end.time - start.time
     num_clusters = suppressWarnings(length(as.numeric(levels(as.factor(dataset@meta.data[["seurat_clusters"]])))))
     time_list = list(time = time.taken, ref_name = ref_name, assay = assay, cluster_name = cluster_name, resolution = resolution, method_name = method_name, num_clusters = num_clusters, random_seed = random_seed)
-    saveRDS(time_list, paste0(paste(ref_name, assay, cluster_name, resolution, method_name, random_seed, num_clusters), '.rds'))
+    saveRDS(time_list, paste0(paste(ref_name, assay, cluster_name, resolution, method_name, random_seed, num_clusters), name_extra, '.rds'))
+
   }
   return(dataset)
+}
+
+
+paths = list()
+data = list()
+
+if (is_helmsley) {
+  samples = c('GCA1', 'GCA2', 'GCA3', 'GCA5', 'GCA7', 'GCA8', 'GCA9', 'GCA10', 'GCA11', 'GCA12', 'GCA13', 'GCA14', 'GCA15', 'GCA16', 'GCA17', 'GCA18', 'GCA19', 'GCA20', 'GCA21', 'GCA22', 'GCA23', 'GCA24', 'GCA25', 'GCA26', 'GCA27', 'GCA28', 'GCA29')
+  patient_disease = c('control', 'treatment naive-CD', 'CD', 'CD', 'control', 'control', 'CD', 'control', 'treatment naive-CD', 'control', 'CD', 'CD', 'control', 'CD', 'CD', 'CD', 'treatment naive-CD', 'CD', 'treatment naive-CD', 'CD', 'treatment naive-CD', 'CD', 'treatment naive-CD', 'CD', 'CD', 'CD', 'treatment naive-CD')
+  if (!dir.exists("counts")) {
+    files <- list.files(path = "GSE202052_RAW", full.names = TRUE)
+    dir.create("counts")
+
+    for (file in files) {
+      filename_parts <- unlist(strsplit(basename(file), "_"))
+      sample_id = filename_parts[2]
+      new_file_name = filename_parts[3]
+      subfolder_path <- file.path("counts", sample_id)
+      if (!dir.exists(subfolder_path)) {
+        dir.create(subfolder_path)
+      }
+      file.copy(file, subfolder_path)
+      name <- unlist(strsplit(basename(file), "/"))
+      file.rename(paste0(subfolder_path, '/', name), paste0(subfolder_path, '/', new_file_name))
+    }
+  }
+  disease_phenotype_names = c("control", "treatment naive-CD", "CD")
+
+  data_filename = 'data.rds'
+  ref_name = paste0('helmsley', '_', assay, '_')
+} else {
+  ref_name = paste0(strsplit(reference_name, '/')[[1]], '_', assay, '_')
+  data_filename = paste0(strsplit(reference_name, '/')[[1]], '_', 'RNA', '_', 'ref_data', '.rds')
+}
+
+if (is_helmsley) {
+  equivalent_clustering_filename = paste0("seurat_equivalent_clustering_helmsley_", assay, "_")
+} else {
+  equivalent_clustering_filename = paste0("seurat_equivalent_clustering_reference", '_', ref_name)
+}
+equivalent_clustering_filename = paste0(equivalent_clustering_filename, c_resolution, '_', DEG_cutoff, name_extra, '.rds')
+
+if (!is_helmsley) {
+  if (reference_name == "human_PBMC/") {
+    annotation_levels = 3
+  }
+  if (reference_name == "human_tonsil/") {
+    annotation_levels = 3
+  }
+  if (reference_name == "human_fetus/") {
+    annotation_levels = 2
+  }
+  if (reference_name == "human_adipose/") {
+    annotation_levels = 2
+  }
+}
+
+# Create the initial reference dataset seurat objects from output of Azimuth snakemake files
+SetDirWrite()
+if (!file.exists(data_filename)) {
+  SetDirRead()
+  if (is_helmsley) {
+    patient_ids = samples
+    for (patient_id in patient_ids) {
+      print(patient_id)
+      data[[patient_id]] <- CreateSeuratObject(counts = Read10X(data.dir = file.path("counts", patient_id), gene.column = 2))
+    }
+  } else {
+    if (reference_name == "human_PBMC/") {
+      data <- LoadH5Seurat("azimuth-references/human_pbmc/data/pbmc_multimodal.h5seurat")
+      temp = CreateSeuratObject(data@assays$SCT@counts, assay = "RNA")
+      data@assays$RNA = temp@assays$RNA
+      data = AddMetaData(object = data, metadata = data@meta.data$orig.ident, col.name = 'patient')
+      current_idents = Idents(data)
+      data = AddMetaData(object = data, metadata = data@meta.data$celltype.l3 != 'Doublet', col.name = 'is_singlet')
+      print(length(data@meta.data$is_singlet))
+      print(sum(data@meta.data$is_singlet))
+      print(length(data@meta.data$is_singlet) - sum(data@meta.data$is_singlet))
+      Idents(data) <- 'is_singlet'
+      data = subset(data, idents = TRUE)
+      Idents(data) = current_idents
+      for (metadata_name in names(data@meta.data)) {
+        if (!(metadata_name %in% c('patient', 'nCount_RNA', 'nFeature_RNA', 'celltype.l1', 'celltype.l2', 'celltype.l3'))) {
+          data@meta.data[[metadata_name]] = NULL
+        }
+      }
+    }
+    if (reference_name == "human_tonsil/") {
+      data <- readRDS('azimuth-references/human_tonsil/data/obj.rds')
+      data = AddMetaData(object = data, metadata = data@meta.data$donor_id, col.name = 'patient')
+      data = AddMetaData(object = data, metadata = data@meta.data$annotation_level_1, col.name = 'celltype.l1')
+      data = AddMetaData(object = data, metadata = data@meta.data$annotation_figure_1, col.name = 'celltype.l2')
+      data = AddMetaData(object = data, metadata = data@meta.data$annotation_20220215, col.name = 'celltype.l3')
+      for (metadata_name in names(data@meta.data)) {
+        if (!(metadata_name %in% c('patient', 'nCount_RNA', 'nFeature_RNA', 'celltype.l1', 'celltype.l2', 'celltype.l3'))) {
+          data@meta.data[[metadata_name]] = NULL
+        }
+      }
+    }
+    if (reference_name == "human_fetus/") {
+      data <- readRDS('azimuth-references/human_fetus/seurat_objects/fullref.Rds')
+      data = AddMetaData(object = data, metadata = data@meta.data$Fetus_id, col.name = 'patient')
+      data = AddMetaData(object = data, metadata = data@meta.data$annotation.l1, col.name = 'celltype.l1')
+      data = AddMetaData(object = data, metadata = data@meta.data$annotation.l2, col.name = 'celltype.l2')
+      for (metadata_name in names(data@meta.data)) {
+        if (!(metadata_name %in% c('patient', 'nCount_RNA', 'nFeature_RNA', 'celltype.l1', 'celltype.l2', 'celltype.l3'))) {
+          data@meta.data[[metadata_name]] = NULL
+        }
+      }
+    }
+    if (reference_name == "human_adipose/") {
+      data <- readRDS('azimuth-references/human_adipose/full_reference.Rds')
+      data = AddMetaData(object = data, metadata = data@meta.data$Number, col.name = 'patient')
+      for (metadata_name in names(data@meta.data)) {
+        if (!(metadata_name %in% c('patient', 'nCount_RNA', 'nFeature_RNA', 'celltype.l1', 'celltype.l2'))) {
+          data@meta.data[[metadata_name]] = NULL
+        }
+      }
+    }
+    for (a in names(data@assays)) {
+      if (a != 'RNA') {
+        print(paste0('removing ', a))
+        data@assays[[a]] = NULL
+      }
+    }
+    DefaultAssay(data) = 'RNA'
+    data@graphs = list()
+    data@reductions = list()
+    data@commands = list()
+
+    if (downsample != 0) {
+      num_cells <- ncol(data)  # Get the total number of cells
+      num_samples <- 5
+      data <- AddMetaData(data, metadata = 1:num_cells, col.name = "index")
+      set.seed(0)
+      shuffled_indices <- sample(1:num_cells)
+
+      # Split the shuffled indices into 5 equal parts
+      # Note: If num_cells is not exactly divisible by num_samples, this will handle the remainder cells
+      index_list <- split(shuffled_indices, ceiling(seq_along(shuffled_indices) / (num_cells / num_samples)))
+
+      selected_indices <- unlist(index_list[-downsample])  # Use all but one part for downsampling
+
+      # Subset the original Seurat object using the selected indices
+
+      current_idents = Idents(data)
+      Idents(data) <- "index"
+      data = subset(data, idents = selected_indices)
+      Idents(data) = current_idents
+    }
+    data <- SplitObject(object = data, split.by = "patient")
+    patient_ids = names(data)
+  }
+  for (patient_idx in seq(length(patient_ids))) {
+    patient_id = patient_ids[[patient_idx]]
+    cell_id = data[[patient_id]][['RNA']]@counts@Dimnames[[2]]
+    cell_num = seq(ncol(data[[patient_id]]))
+    data[[patient_id]] = AddMetaData(object = data[[patient_id]], metadata = cell_id, col.name = 'cell_id')
+    data[[patient_id]] = AddMetaData(object = data[[patient_id]], metadata = cell_num, col.name = 'cell_num')
+
+    data[[patient_id]] <- NormalizeData(data[[patient_id]])
+    data[[patient_id]] <- FindVariableFeatures(data[[patient_id]], nfeatures = HVGs)
+
+    if (is_helmsley) {
+      patient = rep(patient_id, ncol(data[[patient_id]]))
+      disease_phenotype = rep(patient_disease[[patient_idx]], ncol(data[[patient_id]]))
+      data[[patient_id]] = AddMetaData(object = data[[patient_id]], metadata = disease_phenotype, col.name = 'disease_phenotype')
+      data[[patient_id]] = AddMetaData(object = data[[patient_id]], metadata = patient, col.name = 'patient')
+    }
+  }
+  SetDirWrite()
+  saveRDS(data, file = data_filename)
+} else {
+  data = readRDS(data_filename)
+}
+
+patient_ids = names(data)
+for (patient_id in patient_ids) {
+  DefaultAssay(data[[patient_id]]) = 'RNA'
 }
 
 # A helper function to reduce repetitive code for generating seurat clustering plots
-GetClusterPlot <- function(dataset, title, group.by = "seurat_clusters", no_legend = TRUE, shuffle_colors = FALSE) {
+GetClusterPlot <- function(dataset, title, group.by, no_legend = TRUE) {
   #print('getting cluster stats')
-  if (length(group.by) > 1) {
-    plot_title = paste0(title, ' ', group.by[[length(group.by)]])
-  } else {
-    plot_title = paste0(title, ' ', group.by)
-  }
-  if (shuffle_colors) {
-    num_clusters = suppressWarnings(length(as.numeric(levels(as.factor(dataset@meta.data[[group.by]])))))
-    temp_plot = DimPlot(dataset, group.by = group.by, label = no_legend)
-    plot_colors = ggplot_build(temp_plot)$data[[1]]$colour
-    plot_cluster_nums = ggplot_build(temp_plot)$data[[1]]$group
-    new_colors = sample(plot_colors[match(seq(num_clusters), plot_cluster_nums)])
-    seurat_clustering_umap_plot = DimPlot(dataset, group.by = group.by, label = no_legend, cols = new_colors) + ggtitle(plot_title)
-  } else {
-    seurat_clustering_umap_plot = DimPlot(dataset, group.by = group.by, label = no_legend) + ggtitle(plot_title)
-  }
+  plot_title = paste0(title, ' ', group.by)
+  seurat_clustering_umap_plot = DimPlot(dataset, group.by = group.by, label = no_legend) + ggtitle(plot_title)
   if (no_legend) {
     seurat_clustering_umap_plot = seurat_clustering_umap_plot + NoLegend()
   }
-  #print(paste0(paste0(group.by, collapse = '_'), '_UMAP'))
   dataset@misc[[paste0(paste0(group.by, collapse = '_'), '_UMAP_', title)]] = seurat_clustering_umap_plot
   return(dataset)
 }
-
 
 # Calculates shannon entropy of a distribution
 GetEntropy <- function(frac_list) {
@@ -315,7 +640,7 @@ GetEntropy <- function(frac_list) {
 # There is also code for using number of differentially expressed genes between subclusters as a cluster merging criterion.
 # And there is an option to include the entropy cutoff criterion so that computation time is reduced for clustering
 # where we only care about high-entropy clusters and subclusters.
-RecursiveClustering <- function(parent_data, cluster_resolution, max_level, do_integrate, assay, DEG_cutoff, entropy_cutoff = 0, cluster_num = 'cR', cluster_sequence = 'cR', parent_integrated = NULL, level = 0, min_cells = 50) {
+RecursiveClustering <- function(parent_data, cluster_resolution, max_level, do_integrate, assay, DEG_cutoff, entropy_cutoff = 0, cluster_num = 'cR', cluster_sequence = 'cR', parent_integrated = NULL, level = 0, min_cells = 50, HVGs = 2000, fvf.nfeatures = 2000) {
   print(cluster_sequence)
   if (level > 0) {
     Idents(parent_integrated[[level]]) <- "seurat_clusters"
@@ -325,7 +650,7 @@ RecursiveClustering <- function(parent_data, cluster_resolution, max_level, do_i
     # Getting a patient-wise list of cells present in a cluster for the purpose of performing integration recursively
     if (do_integrate) {
       child_data = vector(mode = 'list')
-      npcs = 50
+      npcs = 15
       for (patient_id in names(parent_data)) {
         #print(patient_id)
         if (patient_id %in% parent_integrated_cluster_subset@meta.data$patient) {
@@ -346,9 +671,9 @@ RecursiveClustering <- function(parent_data, cluster_resolution, max_level, do_i
     parent_integrated = vector(mode = 'list')
   }
   if (is_helmsley) {
-    integrated_name = paste0("helmsley_", assay, '_', cluster_resolution, '_', DEG_cutoff, '_', entropy_cutoff, '_', cluster_sequence, ".rds")
+    integrated_name = paste0("helmsley_", assay, '_', cluster_resolution, '_', DEG_cutoff, '_', entropy_cutoff, '_', cluster_sequence, name_extra, ".rds")
   } else {
-    integrated_name = paste0("reference_", ref_name, cluster_resolution, '_', DEG_cutoff, '_', cluster_sequence, ".rds")
+    integrated_name = paste0("reference_", ref_name, cluster_resolution, '_', DEG_cutoff, '_', cluster_sequence, name_extra, ".rds")
   }
   if (!file.exists(integrated_name)) {
     # Code for re-performing seurat integration pipeline on subclusters
@@ -360,22 +685,19 @@ RecursiveClustering <- function(parent_data, cluster_resolution, max_level, do_i
         return()
       }
 
-      child_integration_features <- SelectIntegrationFeatures(object.list = child_data)
-      if (assay == 'SCT') {
-        child_data <- PrepSCTIntegration(object.list = child_data, anchor.features = child_integration_features)
-        normalization.method = "SCT"
-      } else {
-        normalization.method = "LogNormalize"
-      }
+      child_integration_features <- SelectIntegrationFeatures(object.list = child_data, nfeatures = HVGs, fvf.nfeatures = fvf.nfeatures)
+      normalization.method = "LogNormalize"
+
       for (patient_id in names(child_data)) {
-        child_data[[patient_id]] <- ScaleData(child_data[[patient_id]], features = child_integration_features, assay = assay, verbose = FALSE)
-        child_data[[patient_id]] <- RunPCA(child_data[[patient_id]], features = child_integration_features, assay = assay, npcs = npcs, verbose = FALSE)
+        child_data[[patient_id]] <- ScaleData(child_data[[patient_id]], features = child_integration_features, assay = assay, verbose = TRUE)
+        child_data[[patient_id]] <- RunPCA(child_data[[patient_id]], features = child_integration_features, assay = assay, npcs = npcs, verbose = TRUE)
       }
       child_anchors <- FindIntegrationAnchors(object.list = child_data, anchor.features = child_integration_features, normalization.method = normalization.method, reduction = 'rpca', verbose = FALSE)
       for (k.weight in seq(100, 10, -5)) {
+        print(paste0("k.weight value of ", k.weight))
         child_integrated = tryCatch(
           expr = {
-            IntegrateData(anchorset = child_anchors, features = child_integration_features, verbose = FALSE, normalization.method = normalization.method, k.weight = k.weight)
+            IntegrateData(anchorset = child_anchors, features = child_integration_features, verbose = TRUE, normalization.method = normalization.method, k.weight = k.weight)
           },
           error = function(e) {
             print(paste0("k.weight value of ", k.weight, " may be too large, let's try a smaller value"))
@@ -383,10 +705,13 @@ RecursiveClustering <- function(parent_data, cluster_resolution, max_level, do_i
           }
         )
         if (is.string(child_integrated)) {
+          print(child_integrated)
           next
         }
         break
       }
+      # IntegrateData(anchorset = child_anchors, features = child_integration_features, verbose = TRUE, normalization.method = normalization.method, k.weight = 100)
+
       if (is.string(child_integrated)) {
         print(child_integrated)
         print('Integration failed.  Returning as single cluster.')
@@ -508,10 +833,10 @@ RecursiveClustering <- function(parent_data, cluster_resolution, max_level, do_i
 
     for (cluster1 in cluster_nums_entropy) {
       cluster_patient_fracs = list()
-      cluster_idxs = seq(child_integrated$RNA@data@Dim[[2]])[child_integrated@meta.data$seurat_clusters == cluster1]
+      cluster_idxs = seq(child_integrated[[assay]]@data@Dim[[2]])[child_integrated@meta.data$seurat_clusters == cluster1]
       cluster_patients = child_integrated@meta.data$patient[cluster_idxs]
 
-      for (patient_name in names(paths)) {
+      for (patient_name in samples) {
         cluster_patient_fracs[[patient_name]] = length(cluster_patients[cluster_patients == patient_name]) / length(cluster_patients)
       }
 
@@ -534,8 +859,7 @@ RecursiveClustering <- function(parent_data, cluster_resolution, max_level, do_i
     parent_integrated[[level + 1]] = child_integrated
     print(cluster_nums)
     for (cluster_num in cluster_nums) {
-      #out[[paste0(cluster_sequence, 'c', cluster_num)]] = RecursiveClustering(parent_data = child_data, cluster_resolution = cluster_resolution, cluster_num = cluster_num, cluster_sequence = paste0(cluster_sequence, 'c', cluster_num), parent_integrated = parent_integrated, level = level + 1, max_level = max_level, do_integrate = do_integrate, min_cells = min_cells, DEG_cutoff = DEG_cutoff, entropy_cutoff = entropy_cutoff, assay = assay)
-      RecursiveClustering(parent_data = child_data, cluster_resolution = cluster_resolution, cluster_num = cluster_num, cluster_sequence = paste0(cluster_sequence, 'c', cluster_num), parent_integrated = parent_integrated, level = level + 1, max_level = max_level, do_integrate = do_integrate, min_cells = min_cells, DEG_cutoff = DEG_cutoff, entropy_cutoff = entropy_cutoff, assay = assay)
+      RecursiveClustering(parent_data = child_data, cluster_resolution = cluster_resolution, cluster_num = cluster_num, cluster_sequence = paste0(cluster_sequence, 'c', cluster_num), parent_integrated = parent_integrated, level = level + 1, max_level = max_level, do_integrate = do_integrate, min_cells = min_cells, DEG_cutoff = DEG_cutoff, entropy_cutoff = entropy_cutoff, assay = assay, HVGs = HVGs, fvf.nfeatures = fvf.nfeatures)
     }
   }
   #return(out)
@@ -543,34 +867,57 @@ RecursiveClustering <- function(parent_data, cluster_resolution, max_level, do_i
 }
 
 if (is_helmsley) {
-  prefix = paste0("helmsley_", assay, '_', c_resolution, '_', DEG_cutoff, '_', entropy_cutoff)
+  prefix = paste0("helmsley_", assay, '_', c_resolution, '_', DEG_cutoff, '_', entropy_cutoff, name_extra)
 } else {
-  prefix = paste0("reference_", ref_name, c_resolution, '_', DEG_cutoff)
+  prefix = paste0("reference_", ref_name, c_resolution, '_', DEG_cutoff, name_extra)
 }
 done_title = paste0('done integrating ', prefix, '.rds')
 
 # We need to have the integrated dataset
 if (assay == 'integrated') {
   if (!is_helmsley) {
-    integrated_data_filename = paste0('reference_', strsplit(reference_name, '/')[[1]], '_integrated.rds')
+    integrated_data_filename = paste0('reference_', strsplit(reference_name, '/')[[1]], '_integrated')
   } else {
-    integrated_data_filename = paste0("helmsley_integrated.rds")
+    integrated_data_filename = paste0("helmsley_integrated")
   }
-}
 
-if (!file.exists(integrated_data_filename)) {
-  ref_name = paste0(strsplit(reference_name, '/')[[1]], '_', 'RNA', '_')
-  RecursiveClustering(parent_data = data, cluster_resolution = c_resolution, max_level = 0, do_integrate = TRUE, DEG_cutoff = DEG_cutoff, entropy_cutoff = entropy_cutoff, assay = 'RNA')
-  if (is_helmsley) {
-  integrated_name = paste0("helmsley_", 'RNA', '_', c_resolution, '_', DEG_cutoff, '_', entropy_cutoff, '_', 'cR', ".rds")
+  if (!file.exists(paste0(integrated_data_filename, '.rds'))) {
+    ref_name = paste0(strsplit(reference_name, '/')[[1]], '_', 'RNA', '_')
+    RecursiveClustering(parent_data = data, cluster_resolution = c_resolution, max_level = 0, do_integrate = TRUE, DEG_cutoff = DEG_cutoff, entropy_cutoff = entropy_cutoff, assay = 'RNA', HVGs = HVGs, fvf.nfeatures = fvf.nfeatures)
+    if (is_helmsley) {
+      integrated_name = paste0("helmsley_", 'RNA', '_', c_resolution, '_', DEG_cutoff, '_', entropy_cutoff, '_', 'cR', name_extra, ".rds")
+    } else {
+      integrated_name = paste0("reference_", paste0(strsplit(reference_name, '/')[[1]], '_', 'RNA', '_'), c_resolution, '_', DEG_cutoff, '_', 'cR', name_extra, ".rds")
+    }
+    if (!is_helmsley) {
+      file.rename(integrated_name, paste0(integrated_data_filename, ' all assays.rds'))
+      integrated_data = readRDS(paste0(integrated_data_filename, ' all assays.rds'))
+      for (a in names(integrated_data@assays)) {
+        if (a != assay) {
+          print(paste0('removing ', a))
+          integrated_data@assays[[a]] = NULL
+        }
+      }
+      saveRDS(integrated_data, paste0(integrated_data_filename, '.rds'))
+    } else {
+      file.rename(integrated_name, paste0(integrated_data_filename, '.rds'))
+      integrated_data = readRDS(paste0(integrated_data_filename, '.rds'))
+    }
   } else {
-    integrated_name = paste0("reference_", paste0(strsplit(reference_name, '/')[[1]], '_', 'RNA', '_'), c_resolution, '_', DEG_cutoff, '_', 'cR', ".rds")
+    integrated_data = readRDS(paste0(integrated_data_filename, '.rds'))
   }
-  file.rename(integrated_name, integrated_data_filename)
   ref_name = paste0(strsplit(reference_name, '/')[[1]], '_', assay, '_')
 }
-
-integrated_data = readRDS(integrated_data_filename)
+if (assay == 'RNA') {
+  integrated_data_filename = paste0('reference_', strsplit(reference_name, '/')[[1]], '_RNA', '.rds')
+  if (!file.exists(integrated_data_filename)) {
+    print('merging data without integration')
+    integrated_data = merge(x = data[[1]], y = data[2:length(data)])
+    saveRDS(integrated_data, integrated_data_filename)
+  } else {
+    integrated_data = readRDS(paste0(integrated_data_filename))
+  }
+}
 
 if (!is_helmsley) {
   print(paste('resolution', c_resolution, 'DEG cutoff', DEG_cutoff, sep = ' '))
@@ -578,27 +925,43 @@ if (!is_helmsley) {
 
 if (!file.exists(done_title)) {
   if (is_helmsley) {
-    RecursiveClustering(parent_data = integrated_data, cluster_resolution = c_resolution, max_level = m_level, do_integrate = do_integrate, DEG_cutoff = DEG_cutoff, entropy_cutoff = entropy_cutoff, assay = assay)
+    RecursiveClustering(parent_data = integrated_data, cluster_resolution = c_resolution, max_level = m_level, do_integrate = FALSE, DEG_cutoff = DEG_cutoff, entropy_cutoff = entropy_cutoff, assay = assay, HVGs = HVGs, fvf.nfeatures = fvf.nfeatures)
   } else {
-    RecursiveClustering(parent_data = integrated_data, cluster_resolution = c_resolution, max_level = m_level, do_integrate = do_integrate, DEG_cutoff = DEG_cutoff, assay = assay)
+    RecursiveClustering(parent_data = integrated_data, cluster_resolution = c_resolution, max_level = m_level, do_integrate = FALSE, DEG_cutoff = DEG_cutoff, assay = assay, HVGs = HVGs, fvf.nfeatures = fvf.nfeatures)
   }
 }
 
 done = 'done'
 saveRDS(done, done_title)
 
-
 # We read in all saved seurat object for each cluster in the heirarchy which has subclusters into a flat list
 # This way we don't need to re-run the recursive clustering pipeline once the pipeline has finished.
-files <- (Sys.glob(paste0(prefix, "*.rds")))
+prefix_string = strsplit(prefix, " ", fixed = TRUE)[[1]]
+files_glob = paste0(prefix_string[1], '*', paste(prefix_string[-1], collapse = " "), '.rds')
+files = (Sys.glob(files_glob))
+
 recursive_integrated = vector(mode = 'list')
 recursive_integrated_extra = vector(mode = 'list')
+
+cell_counts = list()
 for (file in files) {
-  dataset_name = substr(file, nchar(prefix) + 2, nchar(file) - 4)
+  dataset_name <- gsub(".*_(cR[^ ]*).*", "\\1", file)
+  dataset_name <- sub("\\.rds$", "", dataset_name)
   print(dataset_name)
   temp_integrated = readRDS(file)
   cluster_nums = as.numeric(levels(temp_integrated@meta.data$seurat_clusters))
   num_clusters = length(cluster_nums)
+  cell_counts[[dataset_name]] = temp_integrated[[assay]]@data@Dim[[2]]
+
+  if (!(is_helmsley ||
+    do_lower_clusters_higher_UMAP ||
+    dataset_name == 'cR')) {
+    for (a in names(temp_integrated@assays)) {
+      print(paste0('removing ', a))
+      temp_integrated@assays[[a]] = NULL
+    }
+  }
+
   if (num_clusters > 1) {
     recursive_integrated[[dataset_name]] = temp_integrated
   } else {
@@ -606,21 +969,8 @@ for (file in files) {
   }
 }
 
-# Some basic plotting for the full dataset and each cluster in the heirarchy which has subclusters
-for (dataset_name in names(recursive_integrated)) {
-  print(dataset_name)
-  if (is_helmsley | do_lower_clusters_higher_UMAP) {
-    recursive_integrated[[dataset_name]] <- GetClusterPlot(recursive_integrated[[dataset_name]], title = paste0(dataset_name, ' ', c_resolution), no_legend = FALSE)
-  }
-  if (is_helmsley) {
-    recursive_integrated[[dataset_name]] <- GetClusterPlot(recursive_integrated[[dataset_name]], dataset_name, group.by = "batch", no_legend = FALSE)
-    recursive_integrated[[dataset_name]] <- GetClusterPlot(recursive_integrated[[dataset_name]], dataset_name, group.by = "disease_phenotype", no_legend = FALSE)
-    recursive_integrated[[dataset_name]] <- GetClusterPlot(recursive_integrated[[dataset_name]], dataset_name, group.by = "patient", no_legend = FALSE)
-  } else {
-    recursive_integrated[[dataset_name]] <- GetClusterPlot(recursive_integrated[[dataset_name]], dataset_name, group.by = 'celltype.l1', no_legend = FALSE)
-    recursive_integrated[[dataset_name]] <- GetClusterPlot(recursive_integrated[[dataset_name]], dataset_name, group.by = 'celltype.l2', no_legend = FALSE)
-  }
-}
+print('finished with temp_integrated')
+temp_integrated = NULL
 
 
 # Create a dictionary where the key is the name of each cluster in the heirarchy which has subclusters, and the
@@ -636,9 +986,9 @@ for (type in c('analysis', 'labeling')) {
       cluster = cluster_nums[[i]]
       if (entropy_cutoff > 0 & type == 'analysis') {
         cluster_patient_fracs = list()
-        cluster_idxs = seq(recursive_integrated[[dataset_name]]$RNA@data@Dim[[2]])[recursive_integrated[[dataset_name]]@meta.data$seurat_clusters == cluster]
+        cluster_idxs = seq(cell_counts[[dataset_name]])[recursive_integrated[[dataset_name]]@meta.data$seurat_clusters == cluster]
         cluster_patients = recursive_integrated[[dataset_name]]@meta.data$patient[cluster_idxs]
-        for (patient_name in names(paths)) {
+        for (patient_name in samples) {
           cluster_patient_fracs[[patient_name]] = length(cluster_patients[cluster_patients == patient_name]) / length(cluster_patients)
         }
 
@@ -662,7 +1012,6 @@ for (cluster in names(dataset_child_clusters$analysis)) {
   }
 }
 
-
 # Create a dictionary where the key is the name of each cluster in the heirarchy which has subclusters, and the
 # value is a dictionary of the list of subclusters at each level in the heirarchy contained within the parent cluster
 # In case we have an entropy cutoff, we keep two seperate lists, as some labeling tasks will be expecting all clusters in the heirarchy,
@@ -678,9 +1027,7 @@ for (type in c('analysis', 'labeling')) {
     dataset_level = str_count(dataset_name, "c") - 1
     dataset_level_clusters[[type]][[dataset_name]] = list()
     dataset_sub_cluster_idxs[[dataset_name]] = list()
-    dataset_n_cells = recursive_integrated[[dataset_name]][[assay]]@
-      data@
-      Dim[[2]]
+    dataset_n_cells = cell_counts[[dataset_name]]
     for (level in seq(dataset_level, m_level)) {
       dataset_sub_cluster_level_ids = rep("NULL", dataset_n_cells)
       print(paste0('level ', level))
@@ -727,158 +1074,6 @@ saveRDS(num_clusters_per_level, num_clusters_title)
 num_clusters_per_level = readRDS(num_clusters_title)
 print(num_clusters_per_level)
 
-
-# This code is for generating plots for each cluster in the heirarchy which has subclusters where we can see what
-# the subclusters would have looked like if they were visualized in UMAP space using the PCA embeddings of upper-level
-# (parent, grandparent, etc.) clusters in the heirarchy
-if (do_lower_clusters_higher_UMAP) {
-  for (dataset_name in names(recursive_integrated)) {
-    print(dataset_name)
-    for (level in seq(0, m_level)) {
-      if (paste0('level_', level) %in% names(recursive_integrated[[dataset_name]]@meta.data)) {
-        recursive_integrated[[dataset_name]] <- GetClusterPlot(recursive_integrated[[dataset_name]], group.by = paste0('level_', level), title = dataset_name, no_legend = FALSE, shuffle_colors = TRUE)
-      }
-    }
-  }
-
-  for (dataset_name in names(recursive_integrated)) {
-    higher_level_plots = list()
-    sub_cluster_name_split = unlist(strsplit(dataset_name, split = 'c'))
-    level = length(sub_cluster_name_split) - 2
-    if (level > 0) {
-      for (back_level in seq(level)) {
-        upper_level = level - 1
-        upper_level_name = paste0('level_', upper_level)
-        sub_cluster_parent_name = paste(sub_cluster_name_split[1:(length(sub_cluster_name_split) - back_level)], collapse = 'c')
-        # print(paste(dataset_name, sub_cluster_parent_name, sep = ' '))
-        parent_integrated = recursive_integrated[[sub_cluster_parent_name]]
-        Idents(parent_integrated) = upper_level_name
-        parent_integrated_cluster_subset = subset(parent_integrated, idents = dataset_name)
-        if (suppressWarnings(!all(recursive_integrated[[dataset_name]]@meta.data$cR == parent_integrated_cluster_subset@meta.data$cR))) {
-          # print('some cells are different')
-          print(paste(dataset_name, sub_cluster_parent_name, sep = ' '))
-          if (do_lower_clusters_higher_UMAP) {
-            Idents(parent_integrated_cluster_subset) = 'cR'
-            parent_integrated_cluster_subset = subset(parent_integrated_cluster_subset, idents = recursive_integrated[[dataset_name]]@meta.data$cR)
-          }
-        }
-        if (do_lower_clusters_higher_UMAP) {
-          parent_integrated_cluster_subset@meta.data$seurat_clusters = recursive_integrated[[dataset_name]]@meta.data$seurat_clusters
-          higher_title = paste0(sub_cluster_parent_name, ' Subset Equal to ', dataset_name)
-          parent_integrated_cluster_subset = GetClusterPlot(parent_integrated_cluster_subset, title = higher_title, no_legend = FALSE)
-          higher_level_plots[[sub_cluster_parent_name]] = parent_integrated_cluster_subset@misc[[paste0('seurat_clusters', '_UMAP_', higher_title)]]
-        }
-      }
-      if (do_lower_clusters_higher_UMAP) {
-        recursive_integrated[[dataset_name]]@misc$higher_level_plots = higher_level_plots
-      }
-    }
-  }
-}
-
-assay_equivalent = 'integrated'
-
-# For benchmark datasets, here we generate a high-resolution seurat clustering where the number of clusters generated
-# via a single round of clustering matches the number of (leaf node) clusters generated in a corresponding recursive clustering
-if (!is_helmsley) {
-  m_level_equivalent = m_level
-
-  if (is_helmsley) {
-    equivalent_clustering_filename = paste0("seurat_equivalent_clustering_helmsley_", assay, "_")
-  } else {
-    equivalent_clustering_filename = paste0("seurat_equivalent_clustering_reference", '_', ref_name)
-  }
-  equivalent_clustering_filename = paste0(equivalent_clustering_filename, c_resolution, '_', DEG_cutoff, '.rds')
-
-  # We first start with the resolution parameter used recursive clustering, then we keep doubling the resolution parameter
-  # Until we produce more clusters than in the recursive approach
-  if (!file.exists(equivalent_clustering_filename)) {
-    num_clusters = 0
-    num_clusters_per_resolution = list()
-    num_clusters_per_resolution[[paste0(c_resolution)]] = num_clusters_per_level[[paste0(0)]]
-    seurat_equivalent_clustering = list()
-    seurat_equivalent_clustering_resolution = list()
-    current_resolution = c_resolution
-    while (num_clusters < num_clusters_per_level[[paste0(m_level_equivalent)]]) {
-      temp_integrated = FindSeuratClusters(dataset = recursive_integrated$cR, assay = assay_equivalent, resolution = current_resolution, rerun = FALSE, savetime = TRUE, cluster_name = 'cR', method_name = 'seurat_equivalent')
-      num_clusters = length(as.numeric(levels(temp_integrated@meta.data$seurat_clusters)))
-      print(paste0(current_resolution, ' ', num_clusters))
-      num_clusters_per_resolution[[paste0(current_resolution)]] = num_clusters
-      for (level in seq(0, m_level_equivalent)) {
-        if (num_clusters == num_clusters_per_level[[paste0(level)]]) {
-          seurat_equivalent_clustering[[paste0(level)]] = temp_integrated@meta.data$seurat_clusters
-          seurat_equivalent_clustering_resolution[[paste0(level)]] = current_resolution
-        }
-      }
-      current_resolution = 2 * current_resolution
-    }
-
-    print(num_clusters_per_level)
-
-    # Next, we use a pseudo binary search type approach to narrow in on a resolution parameter value which can generate
-    # the same number of clusters as the recursive clustering approach.  For the louvain clustering which is used, the
-    # number of clusters generated is not quite a monotonic function of resolution parameter value, and some stochasticity
-    # is involved in the number of clusters generated by the louvain approach, so we use a different random seed at each
-    # iteration so that an equivalent number of clusters can be generated in spite of the lack of monotonicity of the
-    # number of clusters as a function of resolution
-    for (level in seq(0, m_level_equivalent)) {
-      random_seed = -1
-      while (!(paste0(level) %in% names(seurat_equivalent_clustering))) {
-        random_seed = random_seed + 1
-        lower_bound = min(as.numeric(names(num_clusters_per_resolution)))
-        upper_bound = max(as.numeric(names(num_clusters_per_resolution)))
-        for (res in names(num_clusters_per_resolution)) {
-          res = as.numeric(res)
-          if (res > lower_bound && num_clusters_per_resolution[[paste0(res)]] < num_clusters_per_level[[paste0(level)]]) {
-            lower_bound = res
-          }
-          if (res < upper_bound && num_clusters_per_resolution[[paste0(res)]] > num_clusters_per_level[[paste0(level)]]) {
-            upper_bound = res
-          }
-        }
-        print(paste0('level ', level, ' num clusters ', num_clusters_per_level[[paste0(level)]], ' lower bound ', lower_bound, ' upper bound ', upper_bound, ' lower bound clusters ', num_clusters_per_resolution[[paste0(lower_bound)]], ' upper bound clusters ', num_clusters_per_resolution[[paste0(upper_bound)]]))
-        current_resolution = upper_bound - (upper_bound - lower_bound) / 2
-        temp_integrated <- FindSeuratClusters(dataset = recursive_integrated$cR, assay = assay_equivalent, resolution = current_resolution, rerun = FALSE, random_seed = random_seed, savetime = TRUE, cluster_name = 'cR', method_name = 'seurat_equivalent')
-
-        num_clusters = length(as.numeric(levels(temp_integrated@meta.data$seurat_clusters)))
-        print(paste0(current_resolution, ' ', num_clusters))
-        num_clusters_per_resolution[[paste0(current_resolution)]] = num_clusters
-        for (level2 in seq(m_level_equivalent)) {
-          if (num_clusters == num_clusters_per_level[[paste0(level2)]]) {
-            seurat_equivalent_clustering[[paste0(level2)]] = temp_integrated@meta.data$seurat_clusters
-            seurat_equivalent_clustering_resolution[[paste0(level)]] = current_resolution
-          }
-        }
-      }
-    }
-    temp = seurat_equivalent_clustering
-    seurat_equivalent_clustering = list()
-    for (level in seq(0, m_level_equivalent)) {
-      seurat_equivalent_clustering[[paste0(level)]] = temp[[paste0(level)]]
-    }
-    temp = NULL
-    print(length(as.numeric(levels(temp_integrated@meta.data$seurat_clusters))))
-    saveRDS(seurat_equivalent_clustering, file = equivalent_clustering_filename)
-  } else {
-    seurat_equivalent_clustering = readRDS(equivalent_clustering_filename)
-  }
-
-
-  # Create cluster plots for the generated high-resolution equivalent clustering
-  for (dataset_name in names(recursive_integrated)) {
-    print(dataset_name)
-    for (level in seq(0, m_level)) {
-      if (paste0('level_', level, '_seurat_equivalent') %in% names(recursive_integrated[[dataset_name]]@meta.data)) {
-        recursive_integrated[[dataset_name]] <- GetClusterPlot(recursive_integrated[[dataset_name]], group.by = paste0('level_', level, '_seurat_equivalent'), title = dataset_name, no_legend = FALSE, shuffle_colors = TRUE)
-      }
-    }
-  }
-  # Label the base dataset with the generated high-resolution equivalent clustering labels for each cell
-  for (level in seq(0, m_level_equivalent)) {
-    recursive_integrated[['cR']] = AddMetaData(object = recursive_integrated[['cR']], metadata = seurat_equivalent_clustering[[paste0(level)]], col.name = paste0('level_', level, '_seurat_equivalent'))
-  }
-}
-
 # A recursive algorithm for finding a depth-first search-like ordered list of cluster names in the cluster heirarchy
 GetRecursiveClusterNames <- function(recursive_data, cluster_sequence = 'cR', cluster_list = NULL) {
   cluster_list = c(cluster_list, cluster_sequence)
@@ -899,133 +1094,228 @@ recursive_cluster_list = GetRecursiveClusterNames(recursive_data = recursive_int
 level_ordered_cluster_names = c('cR', as.vector(unlist(dataset_level_clusters[['analysis']][['cR']])))
 level_ordered_cluster_names = level_ordered_cluster_names[!duplicated(level_ordered_cluster_names)]
 
-
-# Get a list of seurat objects for all clusters in the heirarchy for which we performed an additional iteration
-# of the seurat clustering pipeline but found no additional clusters
-recursive_unintegrated = list()
-for (cluster_name in level_ordered_cluster_names) {
-  sub_cluster_name_split = unlist(strsplit(cluster_name, split = 'c'))
-  upper_level_cluster_name = paste(sub_cluster_name_split[1:(length(sub_cluster_name_split) - 1)], collapse = 'c')
-  cluster_num = tail(sub_cluster_name_split, 1)
-  if (!(cluster_name %in% names(recursive_integrated))) {
-    if (!(cluster_name %in% names(recursive_integrated_extra))) {
-      print(cluster_name)
-      parent_integrated = recursive_integrated[[upper_level_cluster_name]]
-      Idents(parent_integrated) <- "seurat_clusters"
-      child_integrated = subset(parent_integrated, idents = cluster_num)
-      temp = parent_integrated@assays[[assay_equivalent]]@var.features
-      DefaultAssay(child_integrated) = assay
-      child_integrated = FindVariableFeatures(child_integrated, verbose = FALSE)
-      print(1 - length(intersect(temp, child_integrated@assays[[assay]]@var.features)) / length(temp))
-      recursive_unintegrated[[cluster_name]] = child_integrated
-    }
-  }
-}
-
-
-# Code for generating the heatmaps for cluster statistical significance in the Abundance and DEG based patient-wise
-# comparison of phenotypes by cluster analysis
-GetTestHeatmap <- function(mat, x_var_name, y_var_name, fill_name, text = TRUE, significance = NULL, wrap_var_name = NULL, title_list = NULL, rounding = NULL, angle = NULL, font_size = 3.88) {
-  if (!is.null(rounding)) {
-    g_text = geom_text(aes(label = round(value, rounding)), size = font_size)
-  } else {
-    g_text = geom_text(aes(label = value), size = font_size)
-  }
-  plot <- ggplot(mat, aes_string(x = x_var_name, y = y_var_name, fill = fill_name)) +
-    geom_tile() +
-    ylim(rev(levels(as.factor(mat[[y_var_name]]))))
-  base_color = '#669bcc'
-  upper_color = toupper('#FFFFFF')
-  middle_color = toupper(lighten(base_color, amount = 0.9))
-  lower_color = toupper(darken(base_color, amount = 0.4))
-  if (fill_name == 'P.value') {
-    my_breaks = c(significance / 100, significance / 10, significance)
-    plot = plot + scale_fill_gradient2(midpoint = 0.005, low = lower_color, mid = middle_color, high = upper_color, space = "Lab", trans = "log10", limits = c(min(mat$P.value), significance), labels = my_breaks, breaks = my_breaks, na.value = "white")
-  } else {
-    plot = plot + scale_fill_gradient2(low = "white", high = "darkgreen", space = "Lab", na.value = "white")
-  }
-  if (!is.null(angle)) {
-    plot = plot + theme(axis.text.x = element_text(angle = angle, vjust = 0.35, hjust = 0))
-  }
-
-  if (!is.null(wrap_var_name)) {
-    if (wrap_var_name == 'comparison') {
-      plot = plot + facet_wrap(~comparison, scales = 'free_y', ncol = length(unique(mat['comparison'])))
-    }
-    if (wrap_var_name == 'type') {
-      plot = plot + facet_wrap(~type, scales = 'free_y', ncol = length(unique(mat['type'])))
-    }
-  }
-  if (text) {
-    plot = plot + g_text
-  }
-  if (!is.null(title)) {
-    plot = plot + ggtitle(str_to_title(str_replace(paste(title_list, collapse = ', '), pattern = '_', replacement = ' ')))
-  }
-  return(plot)
-}
-
-
-# Code for generating the cluster purity plots for benchmark analysis
-GetCorrespondencePlot <- function(dataset, cluster_level, annotation_level, title) {
-  subset_cluster_df = data.frame(cluster = as.vector(dataset@meta.data[[cluster_level]]), l1 = dataset@meta.data[[annotation_level]])
-
-  subset_grouped <- suppressMessages(suppressWarnings(list(l1 = dcast(subset_cluster_df, cluster ~ l1, fun.aggregate = length))))
-
-  subset_correspondence_row_normalized <- list(l1 = NULL)
-
-  for (level in names(subset_correspondence_row_normalized)) {
-    subset_grouped_matrix = data.matrix(subset_grouped[[level]][tail(names(subset_grouped[[level]]), length(names(subset_grouped[[level]])) - 1)])
-    rownames(subset_grouped_matrix) <- as.vector(subset_grouped[[level]][['cluster']])
-
-    subset_grouped_matrix_row_normalized = subset_grouped_matrix / rowSums(subset_grouped_matrix)
-
-    row_order_names <- vector()
-    row = 0
-    for (column_idx in seq(ncol(subset_grouped_matrix_row_normalized))) {
-      temp_reordered <- subset_grouped_matrix_row_normalized[order(subset_grouped_matrix_row_normalized[, column_idx], decreasing = TRUE),]
-      for (row_idx in seq(nrow(temp_reordered))) {
-        argmax = length(integer(which.max(temp_reordered[row_idx,])))
-        if (argmax == column_idx) {
-          row = row + 1
-          row_order_names[[row]] = rownames(temp_reordered)[[row_idx]]
-        }
+if (is_helmsley) {
+  # Get a list of seurat objects for all clusters in the heirarchy for which we performed an additional iteration
+  # of the seurat clustering pipeline but found no additional clusters
+  recursive_unintegrated = list()
+  for (cluster_name in level_ordered_cluster_names) {
+    sub_cluster_name_split = unlist(strsplit(cluster_name, split = 'c'))
+    upper_level_cluster_name = paste(sub_cluster_name_split[1:(length(sub_cluster_name_split) - 1)], collapse = 'c')
+    cluster_num = tail(sub_cluster_name_split, 1)
+    if (!(cluster_name %in% names(recursive_integrated))) {
+      if (!(cluster_name %in% names(recursive_integrated_extra))) {
+        print(cluster_name)
+        parent_integrated = recursive_integrated[[upper_level_cluster_name]]
+        Idents(parent_integrated) <- "seurat_clusters"
+        child_integrated = subset(parent_integrated, idents = cluster_num)
+        temp = parent_integrated@assays[[assay]]@var.features
+        DefaultAssay(child_integrated) = assay
+        child_integrated = FindVariableFeatures(child_integrated, verbose = FALSE)
+        print(1 - length(intersect(temp, child_integrated@assays[[assay]]@var.features)) / length(temp))
+        recursive_unintegrated[[cluster_name]] = child_integrated
       }
     }
-
-    subset_grouped_matrix_row_normalized = subset_grouped_matrix_row_normalized[rev(row_order_names),]
-    subset_grouped_df_final <- as.data.frame(as.table(subset_grouped_matrix_row_normalized))
-    subset_correspondence_row_normalized[[level]] <- subset_grouped_df_final
-    colnames(subset_correspondence_row_normalized[[level]]) = c("Cluster", "Type", "Proportion")
-    cell_names = aggregate(Proportion ~ Type, data = subset_correspondence_row_normalized[[level]], FUN = max)
-    cell_names$Proportion = 0
-
-    out_temp = merge(aggregate(Proportion ~ Cluster, data = subset_correspondence_row_normalized[[level]], FUN = max), subset_correspondence_row_normalized[[level]], by = c("Proportion", "Cluster"))
-    out = list()
-    out_temp2 = aggregate(Proportion ~ Type, data = rbind(cell_names, aggregate(Proportion ~ Type, data = out_temp, FUN = mean)), FUN = max)
-
-    out[['Cell Type Mean Cluster Purity']] = out_temp2$Proportion
-    out[['Cluster Purity']] = out_temp$Proportion
-
-    color_values = seq(100) / 100
-    palette = colorRampPalette(c('white', 'orange', 'red'))(length(color_values))
-
-    plot <- ggplot(subset_correspondence_row_normalized[[level]], aes(x = Type, y = Cluster, fill = Proportion)) +
-      geom_tile() +
-      geom_text(aes(label = round(Proportion, 2), color = ifelse(Proportion < 0.005, "light grey", 'black')), size = 3.5) +
-      scale_fill_gradient2(midpoint = 0.5, low = "white", mid = palette[20], high = palette[70], space = "Lab") +
-      scale_color_identity() +
-      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-      ggtitle(title)
-    #suppressMessages(ggsave(filename = paste0(title, '.png'), width = 11, height = 9.92, plot = plot, device = 'png', dpi = 400))
-    print(plot)
-    suppressMessages(ggsave(filename = paste0(title, '.png'), width = 11.7, height = 10.75, plot = plot, device = 'png', dpi = 400))
   }
-  return(out)
 }
 
-# Code for generating the cluster purity analysis for benchmark analysis
+# For benchmark datasets, here we generate a high-resolution seurat clustering where the number of clusters generated
+# via a single round of clustering matches the number of (leaf node) clusters generated in a corresponding recursive clustering
 if (!is_helmsley) {
+
+  # We first start with the resolution parameter used recursive clustering, then we keep doubling the resolution parameter
+  # Until we produce more clusters than in the recursive approach
+  if (!file.exists(equivalent_clustering_filename)) {
+    num_clusters = 0
+    num_clusters_per_resolution = list()
+    num_clusters_per_resolution[[paste0(c_resolution)]] = num_clusters_per_level[[paste0(0)]]
+    seurat_equivalent_clustering = list()
+    seurat_equivalent_clustering_resolution = list()
+    current_resolution = c_resolution
+    while (num_clusters < num_clusters_per_level[[paste0(m_level)]]) {
+      temp_integrated = FindSeuratClusters(dataset = recursive_integrated$cR, assay = assay, resolution = current_resolution, rerun = FALSE, savetime = TRUE, cluster_name = 'cR', method_name = 'seurat_equivalent')
+      num_clusters = length(as.numeric(levels(temp_integrated@meta.data$seurat_clusters)))
+      print(paste0(current_resolution, ' ', num_clusters))
+      num_clusters_per_resolution[[paste0(current_resolution)]] = num_clusters
+      for (level in m_level) {
+        if (num_clusters == num_clusters_per_level[[paste0(level)]]) {
+          seurat_equivalent_clustering[[paste0(level)]] = temp_integrated@meta.data$seurat_clusters
+          seurat_equivalent_clustering_resolution[[paste0(level)]] = current_resolution
+        }
+      }
+      current_resolution = 2 * current_resolution
+    }
+
+    print(num_clusters_per_level)
+
+    # Next, we use a pseudo binary search type approach to narrow in on a resolution parameter value which can generate
+    # the same number of clusters as the recursive clustering approach.  For the louvain clustering which is used, the
+    # number of clusters generated is not quite a monotonic function of resolution parameter value, and some stochasticity
+    # is involved in the number of clusters generated by the louvain approach, so we use a different random seed at each
+    # iteration so that an equivalent number of clusters can be generated in spite of the lack of monotonicity of the
+    # number of clusters as a function of resolution
+
+    for (level in m_level) {
+      random_seed = -1
+      lower_bound = min(as.numeric(names(num_clusters_per_resolution)))
+      upper_bound = max(as.numeric(names(num_clusters_per_resolution)))
+      for (res in names(num_clusters_per_resolution)) {
+        res = as.numeric(res)
+        if (res > lower_bound && num_clusters_per_resolution[[paste0(res)]] < num_clusters_per_level[[paste0(level)]]) {
+          lower_bound = res
+        }
+        if (res < upper_bound && num_clusters_per_resolution[[paste0(res)]] > num_clusters_per_level[[paste0(level)]]) {
+          upper_bound = res
+        }
+      }
+      while (!(paste0(level) %in% names(seurat_equivalent_clustering))) {
+        random_seed = random_seed + 1
+
+        print(paste0('level ', level, ' num clusters ', num_clusters_per_level[[paste0(level)]], ' lower bound ', lower_bound, ' upper bound ', upper_bound, ' lower bound clusters ', num_clusters_per_resolution[[paste0(lower_bound)]], ' upper bound clusters ', num_clusters_per_resolution[[paste0(upper_bound)]]))
+        current_resolution = upper_bound - (upper_bound - lower_bound) / 2
+        temp_integrated <- FindSeuratClusters(dataset = recursive_integrated$cR, assay = assay, resolution = current_resolution, rerun = FALSE, random_seed = random_seed, savetime = TRUE, cluster_name = 'cR', method_name = 'seurat_equivalent')
+
+        num_clusters = length(as.numeric(levels(temp_integrated@meta.data$seurat_clusters)))
+        print(paste0(current_resolution, ' ', num_clusters))
+        num_clusters_per_resolution[[paste0(current_resolution)]] = num_clusters
+        for (level2 in m_level) {
+          if (num_clusters == num_clusters_per_level[[paste0(level2)]]) {
+            seurat_equivalent_clustering[[paste0(level2)]] = temp_integrated@meta.data$seurat_clusters
+            seurat_equivalent_clustering_resolution[[paste0(level)]] = current_resolution
+          }
+        }
+        if (num_clusters < num_clusters_per_level[[paste0(level)]]) {
+          lower_bound = current_resolution
+        }
+        if (num_clusters > num_clusters_per_level[[paste0(level)]]) {
+          upper_bound = current_resolution
+        }
+
+      }
+    }
+    temp = seurat_equivalent_clustering
+    seurat_equivalent_clustering = list()
+    for (level in m_level) {
+      seurat_equivalent_clustering[[paste0(level)]] = temp[[paste0(level)]]
+    }
+    temp = NULL
+    print(length(as.numeric(levels(temp_integrated@meta.data$seurat_clusters))))
+    saveRDS(seurat_equivalent_clustering, file = equivalent_clustering_filename)
+  } else {
+    seurat_equivalent_clustering = readRDS(equivalent_clustering_filename)
+  }
+
+
+  print('finished with temp_integrated')
+  temp_integrated = NULL
+
+  # Label the base dataset with the generated high-resolution equivalent clustering labels for each cell
+  for (level in m_level) {
+    recursive_integrated[['cR']] = AddMetaData(object = recursive_integrated[['cR']], metadata = seurat_equivalent_clustering[[paste0(level)]], col.name = paste0('level_', level, '_seurat_equivalent'))
+  }
+
+  # Code for generating the heatmaps for cluster statistical significance in the Abundance and DEG based patient-wise
+  # comparison of phenotypes by cluster analysis
+  GetTestHeatmap <- function(mat, x_var_name, y_var_name, fill_name, text = TRUE, significance = NULL, wrap_var_name = NULL, title_list = NULL, rounding = NULL, angle = NULL, font_size = 3.88) {
+    if (!is.null(rounding)) {
+      g_text = geom_text(aes(label = round(value, rounding)), size = font_size)
+    } else {
+      g_text = geom_text(aes(label = value), size = font_size)
+    }
+    plot <- ggplot(mat, aes_string(x = x_var_name, y = y_var_name, fill = fill_name)) +
+      geom_tile() +
+      ylim(rev(levels(as.factor(mat[[y_var_name]]))))
+    base_color = '#669bcc'
+    upper_color = toupper('#FFFFFF')
+    middle_color = toupper(lighten(base_color, amount = 0.9))
+    lower_color = toupper(darken(base_color, amount = 0.4))
+    if (fill_name == 'P.value') {
+      my_breaks = c(significance / 100, significance / 10, significance)
+      plot = plot + scale_fill_gradient2(midpoint = 0.005, low = lower_color, mid = middle_color, high = upper_color, space = "Lab", trans = "log10", limits = c(min(mat$P.value), significance), labels = my_breaks, breaks = my_breaks, na.value = "white")
+    } else {
+      plot = plot + scale_fill_gradient2(low = "white", high = "darkgreen", space = "Lab", na.value = "white")
+    }
+    if (!is.null(angle)) {
+      plot = plot + theme(axis.text.x = element_text(angle = angle, vjust = 0.35, hjust = 0))
+    }
+
+    if (!is.null(wrap_var_name)) {
+      if (wrap_var_name == 'comparison') {
+        plot = plot + facet_wrap(~comparison, scales = 'free_y', ncol = length(unique(mat['comparison'])))
+      }
+      if (wrap_var_name == 'type') {
+        plot = plot + facet_wrap(~type, scales = 'free_y', ncol = length(unique(mat['type'])))
+      }
+    }
+    if (text) {
+      plot = plot + g_text
+    }
+    if (!is.null(title)) {
+      plot = plot + ggtitle(str_to_title(str_replace(paste(title_list, collapse = ', '), pattern = '_', replacement = ' ')))
+    }
+    return(plot)
+  }
+
+
+  # Code for generating the cluster purity plots for benchmark analysis
+  GetCorrespondencePlot <- function(dataset, cluster_level, annotation_level, title) {
+    subset_cluster_df = data.frame(cluster = as.vector(dataset@meta.data[[cluster_level]]), l1 = dataset@meta.data[[annotation_level]])
+
+    subset_grouped <- suppressMessages(suppressWarnings(list(l1 = dcast(subset_cluster_df, cluster ~ l1, fun.aggregate = length))))
+
+    subset_correspondence_row_normalized <- list(l1 = NULL)
+
+    for (level in names(subset_correspondence_row_normalized)) {
+      subset_grouped_matrix = data.matrix(subset_grouped[[level]][tail(names(subset_grouped[[level]]), length(names(subset_grouped[[level]])) - 1)])
+      rownames(subset_grouped_matrix) <- as.vector(subset_grouped[[level]][['cluster']])
+
+      subset_grouped_matrix_row_normalized = subset_grouped_matrix / rowSums(subset_grouped_matrix)
+
+      row_order_names <- vector()
+      row = 0
+      for (column_idx in seq(ncol(subset_grouped_matrix_row_normalized))) {
+        temp_reordered <- subset_grouped_matrix_row_normalized[order(subset_grouped_matrix_row_normalized[, column_idx], decreasing = TRUE),]
+        for (row_idx in seq(nrow(temp_reordered))) {
+          argmax = length(integer(which.max(temp_reordered[row_idx,])))
+          if (argmax == column_idx) {
+            row = row + 1
+            row_order_names[[row]] = rownames(temp_reordered)[[row_idx]]
+          }
+        }
+      }
+
+      subset_grouped_matrix_row_normalized = subset_grouped_matrix_row_normalized[rev(row_order_names),]
+      subset_grouped_df_final <- as.data.frame(as.table(subset_grouped_matrix_row_normalized))
+      subset_correspondence_row_normalized[[level]] <- subset_grouped_df_final
+      colnames(subset_correspondence_row_normalized[[level]]) = c("Cluster", "Type", "Proportion")
+      cell_names = aggregate(Proportion ~ Type, data = subset_correspondence_row_normalized[[level]], FUN = max)
+      cell_names$Proportion = 0
+
+      out_temp = merge(aggregate(Proportion ~ Cluster, data = subset_correspondence_row_normalized[[level]], FUN = max), subset_correspondence_row_normalized[[level]], by = c("Proportion", "Cluster"))
+      out = list()
+      out_temp2 = aggregate(Proportion ~ Type, data = rbind(cell_names, aggregate(Proportion ~ Type, data = out_temp, FUN = mean)), FUN = max)
+
+      out[['Cell Type Mean Cluster Purity']] = out_temp2$Proportion
+      out[['Cluster Purity']] = out_temp$Proportion
+
+      color_values = seq(100) / 100
+      palette = colorRampPalette(c('white', 'orange', 'red'))(length(color_values))
+
+      plot <- ggplot(subset_correspondence_row_normalized[[level]], aes(x = Type, y = Cluster, fill = Proportion)) +
+        geom_tile() +
+        geom_text(aes(label = round(Proportion, 2), color = ifelse(Proportion < 0.005, "light grey", 'black')), size = 3.5) +
+        scale_fill_gradient2(midpoint = 0.5, low = "white", mid = palette[20], high = palette[70], space = "Lab") +
+        scale_color_identity() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+        ggtitle(title)
+      #suppressMessages(ggsave(filename = paste0(title, '.png'), width = 11, height = 9.92, plot = plot, device = 'png', dpi = 400))
+      # print(plot)
+      suppressMessages(ggsave(filename = paste0(title, name_extra, '.png'), width = 11.7, height = 10.75, plot = plot, device = 'png', dpi = 400))
+      graphics.off()
+    }
+    return(out)
+  }
+
+  # Code for generating the cluster purity analysis for benchmark analysis
   values = vector(mode = 'list')
   annotation_level_name_vector = vector(mode = 'character')
   level_name_vector = vector(mode = 'character')
@@ -1037,7 +1327,7 @@ if (!is_helmsley) {
     values_vector_list[[value_type]] = vector(mode = 'numeric')
   }
   for (annotation_level in seq(annotation_levels)) {
-    for (level in seq(m_level)) {
+    for (level in m_level) {
       if (paste0('level_', level, '_seurat_equivalent') %in% names(recursive_integrated$cR@meta.data)) {
         for (clustering in c('Iterative', 'Seurat Equivalent')) {
           if (clustering == 'Iterative') {
@@ -1070,6 +1360,15 @@ if (!is_helmsley) {
     }
   }
 
+  saveRDS(recursive_integrated$cR@meta.data$level_2, paste0('recursive_cluster_assignments_', ref_name, c_resolution, '_', DEG_cutoff, name_extra, '.rds'))
+  saveRDS(recursive_integrated$cR@meta.data$level_2_seurat_equivalent, paste0('seurat_equivalent_cluster_assignments_', ref_name, c_resolution, '_', DEG_cutoff, name_extra, '.rds'))
+
+  if (downsample != 0) {
+    if (!file.exists(paste0('cell_ids_', ref_name, name_extra, '.rds'))) {
+      saveRDS(recursive_integrated$cR@meta.data$index, paste0('cell_ids_', ref_name, name_extra, '.rds'))
+    }
+  }
+
   for (value_type in c('mean', 't_value', 'w_value')) {
     values_df_list[[value_type]] = data.frame(Annotation = annotation_level_name_vector, Level = level_name_vector, type = type_vector, value = values_vector_list[[value_type]])
     results_heatmap = GetTestHeatmap(mat = values_df_list[[value_type]], x_var_name = 'Annotation', y_var_name = 'Level', fill_name = 'value', text = TRUE, significance = NULL, wrap_var_name = 'type', title_list = paste0(str_to_title(str_replace(value_type, pattern = '_', replacement = ' ')), ' Difference Between Iterative vs High-Resolution Clustering ', ref_name, c_resolution, ' ', DEG_cutoff), rounding = 3, angle = NULL, font_size = 3.88) +
@@ -1078,13 +1377,20 @@ if (!is_helmsley) {
     if (value_type == 'mean') {
       print(results_heatmap)
     }
-    ggsave(paste0('results_', value_type, '_', ref_name, c_resolution, '_', DEG_cutoff, '.png'), plot = results_heatmap, device = 'png')
+    ggsave(paste0('results_', value_type, '_', ref_name, c_resolution, '_', DEG_cutoff, name_extra, '.png'), plot = results_heatmap, device = 'png')
+    graphics.off()
   }
-  saveRDS(values, paste0('results_', ref_name, c_resolution, '_', DEG_cutoff, '.rds'))
+  saveRDS(values, paste0('results_', ref_name, c_resolution, '_', DEG_cutoff, name_extra, '.rds'))
 
 }
 num_clusters_title = paste0('num_clusters_', prefix, '.rds')
 num_clusters_per_level = readRDS(num_clusters_title)
 print(num_clusters_per_level)
-
 print('main')
+
+
+
+
+
+
+
