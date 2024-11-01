@@ -12,7 +12,7 @@ Code is in a script format, written in R.
 To reproduce the exact results in the paper, use R version 4.0.5, and run **Install Libraries.R** to install the exact library versions used.
 For Fig. S13 through S15, you will also need to use Python version 3.10, and first run **Install Packages.py** to install the packages used.
 
-A windows 10 environment was used to run **main.R** when producing the results for Fig. 1 through 6, Fig. S5 through S12, Fig. S16 and Fig. S17.
+A windows 10 environment was used to run **main.R** when producing the results for Fig. 1 through 6, Fig. S5 through S12, Fig. S16 and Fig. S17, and to run all other code besides **main.R**.
 A Ubuntu V24 environment was used to run **main.R** when producing the results for Fig. S1 through S4, and Fig. S13 through S15.
 
 To reproduce Fig. 1:
