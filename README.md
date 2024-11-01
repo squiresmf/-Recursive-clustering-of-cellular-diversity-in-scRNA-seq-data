@@ -15,12 +15,9 @@ For Fig. S13 through S15, you will also need to use Python version 3.10, and fir
 A windows 10 environment was used to run **main.R** when producing the clustering results visualized in Fig. 1 through 6, Fig. S5 through S12, Fig. S16 and Fig. S17, and to run all other code besides **main.R**.
 A Ubuntu V24 environment was used to run **main.R** when producing the clustering results visualized in Fig. S1 through S4, and Fig. S13 through S15.
 
-To reproduce Fig. 1:
+To reproduce Fig. 1 and Fig. 2:
   - Run file **main.R** with reference = 'PBMC', c_resolution = 0.025, algorithm = 'Louvain', HVGs = 2000, downsample = 0
   - Run file **TreePlot.R**.  This will produce Fig. 1.
-
-To reproduce Fig. 2:
-  - Run file **main.R** with reference = 'PBMC', c_resolution = 0.025, algorithm = 'Louvain', HVGs = 2000, downsample = 0
   - Run file **Generate PBMC Example.R**.  This will produce Fig. 2, and print out the relative mean cell type purity score between recursive and single-pass.
 
 To reproduce Fig. 3, Fig. 4, Fig. S7 through S12:
