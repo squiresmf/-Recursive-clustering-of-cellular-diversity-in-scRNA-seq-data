@@ -43,13 +43,13 @@ for (level in 2){
         temp_m_heatmap = GetAnnotatedClusterNamesDF(df = temp_m, recursive_cluster_list = recursive_cluster_list, cluster_annotation_list = cluster_annotation_list, cluster_type = 'iterative')
       }
       temp_m['Level'] = substring(unlist(temp_m['Level']), 7, 7)
-      p_value_table_plots_final[[level_name]][[test]][[paste0(alpha)]] =
-        GetTestHeatmap(mat = temp_m_heatmap, significance = alpha, x_var_name = 'Cluster', y_var_name = 'Level', fill_name = 'P.value', title_list = list(metric, 'Difference in Abundance', paste0(test, ' Test')), text = level <= 1, wrap_var_name = 'comparison', rounding = 4) +
-          scale_x_discrete(limits=rev) +
-          facet_wrap(~comparison, scales = 'fixed', ncol = 6) +
-          coord_flip() +
-          scale_y_discrete() +
-          theme(axis.text.x = element_text(angle = 0, vjust = 0.35, size = 14), axis.text.y = element_text(size = 12, family = "mono"), axis.title=element_text(size=14,face="bold"), title = element_text(size=15))
+      # p_value_table_plots_final[[level_name]][[test]][[paste0(alpha)]] =
+      #   GetTestHeatmap(mat = temp_m_heatmap, significance = alpha, x_var_name = 'Cluster', y_var_name = 'Level', fill_name = 'P.value', title_list = list(metric, 'Difference in Abundance', paste0(test, ' Test')), text = level <= 1, wrap_var_name = 'comparison', rounding = 4) +
+      #     scale_x_discrete(limits=rev) +
+      #     facet_wrap(~comparison, scales = 'fixed', ncol = 6) +
+      #     coord_flip() +
+      #     scale_y_discrete() +
+      #     theme(axis.text.x = element_text(angle = 0, vjust = 0.35, size = 14), axis.text.y = element_text(size = 12, family = "mono"), axis.title=element_text(size=14,face="bold"), title = element_text(size=15))
       #print(p_value_table_plots_final[[level_name]][[test]][[paste0(alpha)]])
 
       GetRadialTreeFromDataframe(df = temp_m, tree_comparisons = c('CTRL vs TN-CD', 'CTRL vs CD', 'TN-CD vs CD'), val_name = 'P.value', tree_level = level, gravities = c('NorthEast', 'NorthEast', 'NorthEast'), annotation_colors = annotation_colors)

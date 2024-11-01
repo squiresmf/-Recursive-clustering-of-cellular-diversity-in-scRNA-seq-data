@@ -41,8 +41,8 @@ for (level in seq(m_level)){
         m = melt(t(as.data.frame(m)))
         m = rename(m, Level = Var1, Cluster = Var2)
         m['P.value'] = m['value']
-        p_value_table_plots_temp[[level_name]][[test]][[var_name]][[paste0(alpha)]] =
-          GetTestHeatmap(mat = m, significance = alpha, x_var_name = 'Cluster', y_var_name = 'Level', fill_name = 'P.value', title_list = list(metric, var_name, paste0(test, ' Test')), text = level <= 1, rounding = 4, angle = 90)
+        # p_value_table_plots_temp[[level_name]][[test]][[var_name]][[paste0(alpha)]] =
+        #   GetTestHeatmap(mat = m, significance = alpha, x_var_name = 'Cluster', y_var_name = 'Level', fill_name = 'P.value', title_list = list(metric, var_name, paste0(test, ' Test')), text = level <= 1, rounding = 4, angle = 90)
       }
     }
   }

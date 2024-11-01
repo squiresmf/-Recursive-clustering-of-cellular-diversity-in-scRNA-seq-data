@@ -52,7 +52,7 @@ fracs_by_level = list()
 fracs_by_level_df = list()
 abundance_box_plots = list()
 p_value_tables = list()
-p_value_table_plots = list()
+# p_value_table_plots = list()
 is_significant = list()
 
 #for (cluster_type in c('iterative', 'seurat_equivalent')) {
@@ -166,12 +166,12 @@ for (cluster_type in c('iterative')) {
           if (use_annotations) {
             m = GetAnnotatedClusterNamesDF(df = m, recursive_cluster_list = recursive_cluster_list, cluster_annotation_list = cluster_annotation_list, cluster_type = cluster_type)
           }
-          p_value_table_plots[[cluster_type]][[metric]][[level_name]][[test]][[paste0(alpha)]][[adjusting]] =
-            GetTestHeatmap(mat = m, significance = alpha, x_var_name = 'Cluster', y_var_name = 'Comparison', fill_name = 'P.value', title_list = list(metric, level_name, paste0(test, ' Test')), text = level <= 1, rounding = 4) +
-              coord_flip() +
-              scale_x_discrete(limits = rev) +
-              scale_y_discrete() +
-              theme(axis.text.x = element_text(angle = 0, vjust = 0.35, size = 14), axis.text.y = element_text(size = 12, family = "mono"), axis.title = element_text(size = 14, face = "bold"), title = element_text(size = 15))
+          # p_value_table_plots[[cluster_type]][[metric]][[level_name]][[test]][[paste0(alpha)]][[adjusting]] =
+          #   GetTestHeatmap(mat = m, significance = alpha, x_var_name = 'Cluster', y_var_name = 'Comparison', fill_name = 'P.value', title_list = list(metric, level_name, paste0(test, ' Test')), text = level <= 1, rounding = 4) +
+          #     coord_flip() +
+          #     scale_x_discrete(limits = rev) +
+          #     scale_y_discrete() +
+          #     theme(axis.text.x = element_text(angle = 0, vjust = 0.35, size = 14), axis.text.y = element_text(size = 12, family = "mono"), axis.title = element_text(size = 14, face = "bold"), title = element_text(size = 15))
         }
       }
     }
@@ -191,7 +191,7 @@ for (cluster_type in c('iterative')) {
     }
     temp_combined_m[['value']] = unlist(temp_p_value_column_combined)
     temp_combined_m[['True P']] = temp_combined_m$P.value
-    p_value_table_plots[[cluster_type]][[metric]][[level_name]][['combined']] = list()
+    # p_value_table_plots[[cluster_type]][[metric]][[level_name]][['combined']] = list()
     for (alpha in c(0.05, 0.01)) {
       temp_p_value_column_color = as.list(temp_combined_m[['True P']])
       for (test in tests) {
@@ -212,12 +212,12 @@ for (cluster_type in c('iterative')) {
         temp_combined_m_for_plot = GetAnnotatedClusterNamesDF(df = temp_combined_m_for_plot, recursive_cluster_list = recursive_cluster_list, cluster_annotation_list = cluster_annotation_list, cluster_type = cluster_type)
       }
       temp_combined_m_for_plot$Comparison = factor(temp_combined_m_for_plot$Comparison, ordered = TRUE, levels = c('CTRL vs TN-CD', 'CTRL vs CD', 'TN-CD vs CD'))
-      p_value_table_plots[[cluster_type]][[metric]][[level_name]][['combined']][[paste0(alpha)]] =
-        GetTestHeatmap(mat = temp_combined_m_for_plot, significance = alpha, x_var_name = 'Cluster', y_var_name = 'Comparison', fill_name = 'P.value', title_list = list(metric, level_name, paste0(paste(tests, collapse = ' Test, '), ' Test')), text = level <= 1) +
-          coord_flip() +
-          scale_x_discrete(limits = rev) +
-          scale_y_discrete() +
-          theme(axis.text.x = element_text(angle = 0, vjust = 0.35, size = 14), axis.text.y = element_text(size = 12), axis.title = element_text(size = 14, face = "bold"), title = element_text(size = 15))
+      # p_value_table_plots[[cluster_type]][[metric]][[level_name]][['combined']][[paste0(alpha)]] =
+      #   GetTestHeatmap(mat = temp_combined_m_for_plot, significance = alpha, x_var_name = 'Cluster', y_var_name = 'Comparison', fill_name = 'P.value', title_list = list(metric, level_name, paste0(paste(tests, collapse = ' Test, '), ' Test')), text = level <= 1) +
+      #     coord_flip() +
+      #     scale_x_discrete(limits = rev) +
+      #     scale_y_discrete() +
+      #     theme(axis.text.x = element_text(angle = 0, vjust = 0.35, size = 14), axis.text.y = element_text(size = 12), axis.title = element_text(size = 14, face = "bold"), title = element_text(size = 15))
     }
   }
 }
