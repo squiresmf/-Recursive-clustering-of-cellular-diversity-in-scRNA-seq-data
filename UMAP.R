@@ -6,6 +6,7 @@ library(cluster)
 library(dplyr)
 library(stringr)
 library(gridExtra)
+library(magick)
 
 cluster_list = c('cRc0c2', 'cRc3c0', 'cRc3c1', 'cRc4c0', 'cRc4c1', 'cRc4c2', 'cRc5', 'cRc8', 'cRc10', 'cRc11c0')
 

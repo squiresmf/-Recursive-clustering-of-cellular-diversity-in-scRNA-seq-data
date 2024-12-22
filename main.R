@@ -22,6 +22,7 @@ library(SeuratDisk)
 library(igraph)
 library(future)
 library(future.apply)
+library(arrow)
 # library(pryr) # mem_used()
 
 ################################################  Paper Parameters  ##########################################################
@@ -49,8 +50,8 @@ HVGs = 2000
 downsample = 0
 
 if (reference == 'Helmsley') {
-  # entropy_cutoff = 0.5 # This is the default entropy cutoff parameter for section 2.3 results
-  entropy_cutoff = 0 # Use the entropy cutoff parameter of 0 to generate the full clustering used in supplementary section 5
+  entropy_cutoff = 0.5 # This is the default entropy cutoff parameter for section 2.3 results
+  # entropy_cutoff = 0 # Use the entropy cutoff parameter of 0 to generate the full clustering used in supplementary section 5
 } else {
   entropy_cutoff = 0
 }
@@ -110,7 +111,7 @@ SetDirWrite <- function() {
   setwd(setwd_path)
 }
 
-reference_name = paste0("human_", reference, "/")
+reference_name = paste0("human_", ifelse(reference == "PBMC", reference, tolower(reference)), "/")
 do_lower_clusters_higher_UMAP = TRUE
 m_level = 2
 
@@ -972,6 +973,13 @@ for (file in files) {
 print('finished with temp_integrated')
 temp_integrated = NULL
 
+resolution_for_100_plus_clusters <- list(PBMC = 0.1, Adipose = 0.095, Tonsil = 0.075, Fetus = 0.03)
+if (reference != 'Helmsley' && c_resolution == resolution_for_100_plus_clusters[[reference]]) {
+  # Extract the data matrix
+  data_matrix <- t(GetAssayData(recursive_integrated$cR, slot = "data")[VariableFeatures(recursive_integrated$cR),])
+  # Save data matrix in Feather format
+  write_feather(as.data.frame(data_matrix), paste('matrix', reference, c_resolution, paste0(name_extra, '.feather')))
+}
 
 # Create a dictionary where the key is the name of each cluster in the heirarchy which has subclusters, and the
 # value is a list of subcluster names for that cluster
@@ -1064,6 +1072,10 @@ for (type in c('analysis', 'labeling')) {
   }
 }
 
+if (reference != 'Helmsley' && c_resolution == resolution_for_100_plus_clusters[[reference]]) {
+  saveRDS(recursive_integrated[['cR']], paste0('cR with metadata ', prefix, '.rds'))
+}
+
 # Determine how many clusters are present as leaf nodes if we consider each level as a stopping criterion
 num_clusters_per_level = list()
 for (level in seq(0, m_level)) {
@@ -1089,10 +1101,12 @@ GetRecursiveClusterNames <- function(recursive_data, cluster_sequence = 'cR', cl
 
 # Generate a depth-first search-like ordered list of cluster names in the cluster heirarchy
 recursive_cluster_list = GetRecursiveClusterNames(recursive_data = recursive_integrated)
+# saveRDS(recursive_cluster_list, 'recursive_cluster_list.rds')
 
 # Generate a breadth-first search-like ordered list of cluster names in the cluster heirarchy
 level_ordered_cluster_names = c('cR', as.vector(unlist(dataset_level_clusters[['analysis']][['cR']])))
 level_ordered_cluster_names = level_ordered_cluster_names[!duplicated(level_ordered_cluster_names)]
+# saveRDS(level_ordered_cluster_names, 'level_ordered_cluster_names.rds')
 
 if (is_helmsley) {
   # Get a list of seurat objects for all clusters in the heirarchy for which we performed an additional iteration
@@ -1387,7 +1401,6 @@ num_clusters_title = paste0('num_clusters_', prefix, '.rds')
 num_clusters_per_level = readRDS(num_clusters_title)
 print(num_clusters_per_level)
 print('main')
-
 
 
 

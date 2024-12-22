@@ -1,5 +1,5 @@
 # Code for creating heirarchically structured heat map plots for PCA Similarity analysis
-# This code produces figure 5.  The Crohn's dataset is not currently publicly available.
+# This code produces figure 5.
 
 shared_variable_individual_plots = list()
 shared_variable_final_plots = list()

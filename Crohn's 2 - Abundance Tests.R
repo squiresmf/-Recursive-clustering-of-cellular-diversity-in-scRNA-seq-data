@@ -1,5 +1,4 @@
 # Code for performing statistical tests for patient abundance values and related plots for Crohn's scRNA-seq data analysis
-# The Crohn's dataset is not currently publicly available
 
 for (cluster_type in c('iterative')) {
   for (metric in c('patient_total')) {

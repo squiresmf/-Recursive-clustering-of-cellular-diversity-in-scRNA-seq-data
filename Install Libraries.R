@@ -10,9 +10,9 @@ if (.Platform$OS.type == "windows") {
 }
 
 if (.Platform$OS.type == "windows") {
-  install.packages(c('devtools', 'spam', 'spam64', 'showtext', 'ggpubr', 'mclust', 'aricode', 'magick'), type = "binary")
+  install.packages(c('devtools', 'spam', 'spam64', 'showtext', 'ggpubr', 'mclust', 'aricode', 'magick', 'arrow'), type = "binary")
 } else {
-  install.packages(c('devtools', 'spam', 'spam64', 'showtext', 'ggpubr', 'mclust', 'aricode'))
+  install.packages(c('devtools', 'spam', 'spam64', 'showtext', 'ggpubr', 'mclust', 'aricode', 'arrow'))
 }
 
 library(devtools)

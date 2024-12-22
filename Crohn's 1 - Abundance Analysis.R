@@ -1,5 +1,4 @@
 # Code for calculating patient abundance values and related plots for Crohn's scRNA-seq data analysis
-# The Crohn's dataset is not currently publicly available
 
 patient_names = samples
 num_cells_patient = list()

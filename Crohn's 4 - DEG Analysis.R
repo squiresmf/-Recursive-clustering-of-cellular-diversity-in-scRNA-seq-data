@@ -1,5 +1,4 @@
 # Code for for Crohn's scRNA-seq data DEG analysis
-# The Crohn's dataset is not currently publicly available
 
 patient_names = samples
 
@@ -7,6 +6,8 @@ patient_names = samples
 
 # # Using split to create the named list
 # phenotype_patients = split(patient_metadata$`Sample ID`, patient_metadata$`Disease phenotype`)
+
+# level_ordered_cluster_names = readRDS('level_ordered_cluster_names.rds')
 
 phenotype_patients = split(samples, patient_disease)
 

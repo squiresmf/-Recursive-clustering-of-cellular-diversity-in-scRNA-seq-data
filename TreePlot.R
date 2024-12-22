@@ -1,7 +1,8 @@
 # Code for generating hierarchical clustering tree plots.
 # This code will reproduce figure 1 if main has been run with c_resolution = 0.02 and reference_name = "human_PBMC/"
 # This code also includes functions used to generate Crohn's scRNA-seq data analysis figures 5 and 6
-# graphics.off()
+
+# recursive_cluster_list = readRDS('recursive_cluster_list.rds')
 
 radial_tree_list = list()
 radial_tree_list_no_color = list()
@@ -94,7 +95,7 @@ GetRadialTreeFromDataframe <- function(df, tree_comparisons, val_name, tree_leve
       color_values[color_values < 0.0015] = 0.0015
       color_values = -log10(color_values)
     }
-    if (val_name == 'DEGs') {
+    if (val_name == 'DEG Count') {
       max_percentile = 0.99
       # The scale for DEG is limited to a maximum of the max_percentile percentile of the DEG values, so all DEG values higher
       # than max_percentile percentile will have the same color as the max_percentile percentile value
@@ -108,7 +109,7 @@ GetRadialTreeFromDataframe <- function(df, tree_comparisons, val_name, tree_leve
     }
     colors_node = palette[cut(color_values, length(color_values))]
     colors_stroke = colors_node
-    if (val_name == 'DEGs') {
+    if (val_name == 'DEG Count') {
       colors_stroke[color_values < 0.20 * max(color_values)] = 'D3D3D3'
     }
 
@@ -134,7 +135,7 @@ GetRadialTreeFromDataframe <- function(df, tree_comparisons, val_name, tree_leve
     radial_tree = radialNetwork(radial_tree_list_no_color[[paste0(tree_level)]], fontSize = 12 - tree_level, fontFamily = "verdana", linkColour = "#bbb", nodeColour = colors_node_JS, textColour = '232b2b', nodeStroke = colors_stroke_JS)
     tree_name = paste0(stri_trans_general(str = paste('radial_tree', tree_level, tree_comparison, val_name, sep = ' '), id = "Latin-ASCII"), title_extra)
     saveNetwork(radial_tree, paste0(tree_name, '.html'), selfcontained = FALSE)
-    webshot(paste0(tree_name, '.html'), paste0(tree_name, '.png'), vwidth = (tree_level + 2) * dimension, vheight = (level + 2) * dimension, zoom = 3)
+    webshot(paste0(tree_name, '.html'), paste0(tree_name, '.png'), vwidth = (tree_level + 2) * dimension, vheight = (tree_level + 2) * dimension, zoom = 3)
     image_write(image_trim(image_read(paste0(tree_name, '.png'), strip = TRUE)), paste0(tree_name, '.png'), format = 'png')
 
     if (val_name == 'P.value') {
@@ -161,8 +162,12 @@ GetRadialTreeFromDataframe <- function(df, tree_comparisons, val_name, tree_leve
                                           breaks = c(0.05, 0.015, 0.005, 0.0015), labels = c(0.05, 0.015, 0.005, 0.0015))
     } else if (val_name == 'PCA Similarity') {
       plot = plot + scale_color_gradientn(colours = c(legend_start_color, legend_middle_color, legend_end_color), limits = c(min(color_values), ceiling(max(color_values) * 10)) / 10, name = val_name)
-    } else if (val_name == 'DEGs') {
-      plot = plot + scale_color_gradientn(colours = c(legend_start_color, legend_middle_color, legend_end_color), limits = c(min(color_values), ceiling(max(color_values) * 10)) / 10, name = 'DEG Fold\nChange')
+    } else if (val_name == 'DEG Count') {
+      plot = plot +
+        scale_color_gradientn(colours = c(legend_start_color, legend_middle_color, legend_end_color),
+                              limits = c(min(color_values), ceiling(max(color_values) * 10)) / 10,
+                              name = '````````\n`\n`')  +  theme(legend.title = element_text(size = 20))
+
     } else {
       plot = plot + scale_color_gradientn(colours = c(legend_start_color, legend_middle_color, legend_end_color), limits = c(min(color_values), max(color_values)), name = val_name)
     }
@@ -184,6 +189,55 @@ GetRadialTreeFromDataframe <- function(df, tree_comparisons, val_name, tree_leve
       operator = "Atop",
       gravity = gravities[[tree_comparison_idx]],
     )
+    library(magick)
+
+    # Read the base images
+    pp1 <- image_read(paste0(tree_name, '.png'))
+    pp2 <- image_read(paste0(legend_name, '.png'))
+
+    # Scale the inset image based on the condition
+    if (val_name == 'PCA Similarity') {
+      pp2 <- image_scale(pp2, "25%x")
+    } else {
+      pp2 <- image_scale(pp2, "28%x")
+    }
+
+    if (val_name == 'DEG Count') {
+
+      # Composite the inset image onto the base image
+      img_with_inset <- pp1 %>% image_composite(
+        pp2,
+        operator = "Atop",
+        gravity = gravities[[tree_comparison_idx]]
+      )
+      #
+
+      # Create the text image with white background
+      text_content <- "DEG Count    \nFold Change   \n(Observed/FP)  "  # Replace with your desired text
+      text_font <- "Arial"
+      text_size <- 28
+      text_color <- "black"
+      background_color <- "white"
+      text_box_width <- 210
+      text_box_height <- 100
+
+      text_image <- image_blank(width = text_box_width, height = text_box_height, color = background_color)
+      text_image <- image_annotate(
+        text_image,
+        text = text_content,
+        font = text_font,
+        size = text_size,
+        color = text_color,
+        gravity = "NorthEast"
+      )
+
+      # Composite the text image onto the main image
+      img_with_inset <- img_with_inset %>% image_composite(
+        text_image,
+        operator = "Atop",
+        gravity = 'NorthEast'
+      )
+    }
     img_with_inset = image_transparent(image = img_with_inset, color = '#FFFFFF', fuzz = 0)
     plot.new()
     rasterImage(img_with_inset, 0, 0, 1, 1)

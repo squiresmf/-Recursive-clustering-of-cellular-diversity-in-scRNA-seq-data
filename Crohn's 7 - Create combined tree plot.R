@@ -1,5 +1,4 @@
 # Code for generating figure 6.
-# The Crohn's dataset is not currently publicly available
 
 library(magick)
 library(gridExtra)
@@ -9,15 +8,15 @@ image_list = list()
 
 image_list[[1]] <- image_read("radial_tree 2 CTRL vs TN-CD P.value.png")
 #image_list[[1]] <- image_read("radial_tree 2 control vs treatment naive-CD Samples.png")
-image_list[[2]] <- image_read("radial_tree 2 control vs treatment naive-CD DEGs_empirical.png")
+image_list[[2]] <- image_read("radial_tree 2 control vs treatment naive-CD DEG Count_empirical.png")
 # image_list[[2]] <- image_read("radial_tree 2 control vs treatment naive-CD DEGs0.png")
 image_list[[3]] <- image_read("radial_tree 2 CTRL vs CD P.value.png")
 #image_list[[3]] <- image_read("radial_tree 2 control vs CD Samples.png")
-image_list[[4]] <- image_read("radial_tree 2 control vs CD DEGs_empirical.png")
+image_list[[4]] <- image_read("radial_tree 2 control vs CD DEG Count_empirical.png")
 # image_list[[4]] <- image_read("radial_tree 2 control vs CD DEGs0.png")
 image_list[[5]] <- image_read("radial_tree 2 TN-CD vs CD P.value.png")
 #image_list[[5]] <- image_read("radial_tree 2 treatment naive-CD vs CD Samples.png")
-image_list[[6]] <- image_read("radial_tree 2 treatment naive-CD vs CD DEGs_empirical.png")
+image_list[[6]] <- image_read("radial_tree 2 treatment naive-CD vs CD DEG Count_empirical.png")
 # image_list[[6]] <- image_read("radial_tree 2 treatment naive-CD vs CD DEGs0.png")
 
 location = "0+10"

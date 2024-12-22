@@ -222,3 +222,4 @@ image_write(pp1, paste0('PBMC example heatmaps ', c_resolution, '.eps'), format 
 sprintf("%0.1f%%", (mean_values_list$`Iterative mean`$`annotation level 1`$`Cell Type Mean Cluster Purity`/mean_values_list$`Seurat Equivalent mean`$`annotation level 1`$`Cell Type Mean Cluster Purity`-1) * 100)
 sprintf("%0.1f%%", (mean_values_list$`Iterative mean`$`annotation level 2`$`Cell Type Mean Cluster Purity`/mean_values_list$`Seurat Equivalent mean`$`annotation level 2`$`Cell Type Mean Cluster Purity`-1) * 100)
 
+

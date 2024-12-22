@@ -1,5 +1,4 @@
 # Code for creating heirarchically structured heat map plots for patient abundance Crohn's scRNA-seq data analysis
-# The Crohn's dataset is not currently publicly available
 
 # Abundance
 annotation_colors = list()
