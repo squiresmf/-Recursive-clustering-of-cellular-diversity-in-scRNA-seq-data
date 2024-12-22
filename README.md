@@ -12,25 +12,25 @@ Code is in a script format, written in R.
 To reproduce the exact results in the paper, use R version 4.0.5, and run **Install Libraries.R** to install the exact library versions used.
 For Fig. S13 through S15, you will also need to use Python version 3.10, and first run **Install Packages.py** to install the packages used.
 
-A windows 10 environment was used to run **main.R** when producing the clustering results visualized in Fig. 1 through 6, Fig. S5 through S12, Fig. S16 and Fig. S17, and to run all other code besides **main.R**.
-A Ubuntu V24 environment was used to run **main.R** when producing the clustering results visualized in Fig. S1 through S4, and Fig. S13 through S15.
+A windows 10 environment was used to run **main.R** when producing the clustering results visualized in Fig. 1 through 6, Fig. S5 through S11, Fig. S15 and Fig. S16, and to run all other code besides **main.R**.
+A Ubuntu V24 environment was used to run **main.R** when producing the clustering results visualized in Fig. S1 through S4, and Fig. S12 through S14.
 
 To reproduce Fig. 1 and Fig. 2:
   - Run file **main.R** with reference = 'PBMC', c_resolution = 0.025, algorithm = 'Louvain', HVGs = 2000, downsample = 0
   - Run file **TreePlot.R**.  This will produce Fig. 1.
   - Run file **Generate PBMC Example.R**.  This will produce Fig. 2, and print out the relative mean cell type purity score between recursive and single-pass.
 
-To reproduce Fig. 3, Fig. 4, Fig. S7 through S12:
+To reproduce Fig. 3, Fig. 4, Fig. S6 through S11:
   - Run file **main.R** with reference equal to each of the benchmark dataset values ('PBMC', 'Adipose', 'Tonsil', 'Fetus'), with c_resolution equal to each value of the default resolution range (0.015 to 0.15 by 0.005 increments), algorithm = 'Louvain', HVGs = 2000, downsample = 0
   - Run file **metrics.R** with algorithm = 'Louvain', HVGs = 2000, is_res_range_small = FALSE.
   - Run file **balanced_metrics.py**
-  - Run file **Metric Plot.R** with algorithm = 'Louvain', HVGs = 2000, is_res_range_smalls = FALSE, evaluation_types = 'cell type'.  This will produce Fig. 3, Fig. S7 through Fig. S12
+  - Run file **Metric Plot.R** with algorithm = 'Louvain', HVGs = 2000, is_res_range_smalls = FALSE, evaluation_types = 'cell type'.  This will produce Fig. 3, Fig. S6 through Fig. S11
   - Run file **Relative Cell Type Performance.R**.  This will produce Fig. 4, and will also print out the frequently better captured analysis.
 
 To reproduce Fig. 5 and Fig. 6:
   - Run file **main.R** with reference = 'Helmsley, with c_resolution = 0.1, algorithm = 'Louvain', HVGs = 2000, downsample = 0, entropy_cutoff = 0.5
   - Run file **TreePlot.R**
-  - Run Crohn's R files 1 through 7 (**Crohn's 6 - Shared Variables Tree.R** produces Fig. 5, and **Crohn's 7 - Create combined tree plot.R** produces Fig. 6)
+  - Run Crohn's R files 1 through 7 (**Crohn's 5 - DEG Analysis Tree Map.R** produces Supplementary Tables S1, S2, and S3, **Crohn's 6 - Shared Variables Tree.R** produces Fig. 5, and **Crohn's 7 - Create combined tree plot.R** produces Fig. 6)
 
 To reproduce Fig. S1 through S4:
   - With:
@@ -43,21 +43,32 @@ To reproduce Fig. S1 through S4:
       - Run file **metrics.R** with is_res_range_small = FALSE
       - Run file **Metric Plot.R** with is_res_range_smalls = FALSE, evaluation_types = 'cell type'.  This will produce Fig. S1 through S4.
    
-  To reproduce Fig. S5 and S6:
+  To reproduce Fig. S5:
   - Run file **main.R** with reference equal to each of the benchmark dataset values ('PBMC', 'Adipose', 'Tonsil', 'Fetus'), with c_resolution equal to 0.005 to 0.05 by increments of 0.002 for the PBMC, adipose, and tonsil references, and c_resolution equal to 0.0025 to 0.01 by increments of 0.0002 for the fetus reference, algorithm = 'Louvain', HVGs = 2000, downsample = 0 (assuming the results from running **main.R** for the default resolution range already exist).
   - Run file **metrics.R** with algorithm = 'Louvain', HVGs = 2000, is_res_range_small = TRUE.
-  - Run file **Metric Plot.R** with algorithm = 'Louvain', HVGs = 2000, is_res_range_smalls = c(TRUE, TRUE), evaluation_types = 'cell type'.  This will produce Fig. S5 and S6.
+  - Run file **Metric Plot.R** with algorithm = 'Louvain', HVGs = 2000, is_res_range_smalls = c(TRUE, TRUE), evaluation_types = 'cell type'.  This will produce Fig. S5.
 
-  To reproduce Fig. S13 through S15:
+  To reproduce Fig. S12 through S14:
   - Run file **main.R** with reference equal to each of the benchmark dataset values ('PBMC', 'Adipose', 'Tonsil', 'Fetus'), with c_resolution equal to each value of the default resolution range (0.015 to 0.15 by 0.005 increments), algorithm = 'Louvain', HVGs = 2000, for each value of downsample equal to 1 through 5
   - Run file **consistency metrics.R**
   - Run file **shared cluster members.R**
-  - Run file **Metric Plot.R** with algorithm = 'Louvain', HVGs = 2000, is_res_range_smalls = FALSE, evaluation_types = 'consistency'.  This will produce Fig. S13 through S15.
+  - Run file **Metric Plot.R** with algorithm = 'Louvain', HVGs = 2000, is_res_range_smalls = FALSE, evaluation_types = 'consistency'.  This will produce Fig. S12 through S14.
 
-To reproduce Fig. S16 and S17:
+To reproduce Fig. S15 and S16:
   - Run file **main.R** with reference = 'Helmsley, with c_resolution = 0.1, algorithm = 'Louvain', HVGs = 2000, downsample = 0, entropy_cutoff = 0
   - Run file **TreePlot.R**
-  - Run **Crohn's 6 - Shared Variables Tree.R** to produce Fig. S16
-  - Run **UMAP.R** to produce Fig. S17
+  - Run **Crohn's 6 - Shared Variables Tree.R** to produce Fig. S15
+  - Run **UMAP.R** to produce Fig. S16
 
+To reproduce Fig. S17:
+  - Run file **main.R** with algorithm = 'Louvain', HVGs = 2000, downsample = 0, entropy_cutoff = 0, and:
+      - reference = 'PBMC' c_resolution = 0.1
+      - reference = 'Adipose' c_resolution = 0.095
+      - reference = 'Tonsil' c_resolution = 0.075
+      - reference = 'Fetus' c_resolution = 0.03
+  - Run **UMAP Full.R** to produce Fig. S17
 
+To reproduce the HVG-based Silhouette Analysis from the round 2 reviewer response document:
+  - Run file **main.R** with reference equal to each of the benchmark dataset values ('PBMC', 'Adipose', 'Tonsil', 'Fetus'), with c_resolution equal to each value of the default resolution range (0.015 to 0.15 by 0.005 increments), algorithm = 'Louvain', HVGs = 2000, downsample = 0
+  - Run file **silhouette score.py**
+  - Run file **Metric Plot.R** with algorithm = 'Louvain', HVGs = 2000, is_res_range_smalls = FALSE, evaluation_types = 'silhouette'.  This will produce the silhouette score plot with HVGs as features.
